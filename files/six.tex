@@ -108,8 +108,13 @@ xmlwf0 on Haswell   &  3.929   &   4.363   &   4.554   &   4.876   &   5.178 \\ 
 xmlwf1   &  3.929   &   4.371   &   4.566   &   4.861   &   5.186 \\ \hline
 xmlwf1 on Haswell &   3.566   &   3.978   &   4.163   &   4.451   &   4.787 \\ \hline
 \end{tabular}
-\caption[Performance Comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf). In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is xmlwf0 with the transposition replaced.}
+\caption[Performance Comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf). In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is a copy of xmlwf0 with the transposition replaced.}
+\label{table:xmlwf_perf}
 \end{table}
+
+Table~\ref{table:xmlwf_perf} shows the performance of the XML Validator. The only difference of xmlwf0 and xmlwf1 is their transposition code, and the one in xmlwf1 is written in pure IR with the byte-pack algorithm. We can see xmlwf0 and xmlwf1 share almost identical performance and it is not for free. LLVM 3.5 cannot handle packing on 16-bit field width very well and we custom lower the shufflevector and generate PACKUS instruction for X86.
+
+Another interesting observation is, when we re-compiled the same code on the Intel Haswell platform, we got almost no improvement for xmlwf0, since the IDISA library is for SSE2 and it is written with SSE2 intrinsics; but we got a slightly better performance for xmlwf1, because LLVM backend knows other instruction set like SSE3, SSE4 is available on this platform and thus generating better native code.
 
 \section{Long Stream Addition / Shift}
 
