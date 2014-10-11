@@ -1,0 +1,263 @@
+From: <Saved by Windows Internet Explorer 8>
+Subject: Index of /LocalDoc/latex/thesis
+Date: Fri, 16 Sep 2011 12:03:25 -0700
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----=_NextPart_000_0000_01CC7468.A38F4C80"
+X-MimeOLE: Produced By Microsoft MimeOLE V6.00.2900.6109
+
+This is a multi-part message in MIME format.
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: text/html;
+	charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+Content-Location: http://www.cs.sfu.ca/LocalDoc/latex/thesis/
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML><HEAD><TITLE>Index of /LocalDoc/latex/thesis</TITLE>
+<META content=3D"text/html; charset=3Diso-8859-1" =
+http-equiv=3DContent-Type>
+<META name=3DGENERATOR content=3D"MSHTML 8.00.6001.19120"></HEAD>
+<BODY>
+<H1>Index of /LocalDoc/latex/thesis</H1><PRE><IMG alt=3D"Icon " =
+src=3D"http://www.cs.sfu.ca/icons/blank.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/?C=3DN;O=3DD">Name</A>=
+                    <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/?C=3DM;O=3DA">Last =
+modified</A>      <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/?C=3DS;O=3DA">Size</A>=
+  <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/?C=3DD;O=3DA">Descript=
+ion</A><HR><IMG alt=3D[DIR] src=3D"http://www.cs.sfu.ca/icons/back.gif"> =
+<A href=3D"http://www.cs.sfu.ca/LocalDoc/latex/">Parent Directory</A>    =
+                         -  =20
+<IMG alt=3D[TXT] src=3D"http://www.cs.sfu.ca/icons/text.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/ChangeLog">ChangeLog</=
+A>               12-Aug-2010 16:46  623  =20
+<IMG alt=3D"[   ]" src=3D"http://www.cs.sfu.ca/icons/unknown.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/READ.ME">READ.ME</A>  =
+               09-Apr-1999 17:09  4.7K =20
+<IMG alt=3D[TXT] src=3D"http://www.cs.sfu.ca/icons/text.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/csthesis.dtx">csthesis=
+.dtx</A>            12-Aug-2010 16:44   37K =20
+<IMG alt=3D[TXT] src=3D"http://www.cs.sfu.ca/icons/text.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/csthesis.ins">csthesis=
+.ins</A>            10-Nov-1998 21:02  1.1K =20
+<IMG alt=3D[TXT] src=3D"http://www.cs.sfu.ca/icons/text.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/csthesis.sty">csthesis=
+.sty</A>            12-Aug-2010 16:41   12K =20
+<IMG alt=3D[DIR] src=3D"http://www.cs.sfu.ca/icons/folder.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/doc/">doc/</A>        =
+            19-Mar-1999 15:01    -  =20
+<IMG alt=3D[DIR] src=3D"http://www.cs.sfu.ca/icons/folder.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/files/">files/</A>    =
+              13-Nov-1998 17:26    -  =20
+<IMG alt=3D"[   ]" src=3D"http://www.cs.sfu.ca/icons/tex.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/thes-full.tex">thes-fu=
+ll.tex</A>           12-Nov-1998 22:17  3.0K =20
+<IMG alt=3D"[   ]" src=3D"http://www.cs.sfu.ca/icons/tex.gif"> <A =
+href=3D"http://www.cs.sfu.ca/LocalDoc/latex/thesis/thes-short.tex">thes-s=
+hort.tex</A>          12-Nov-1998 22:17  1.2K =20
+<HR></PRE><PRE>READ.ME file for the `csthesis' bundle (November 1998)
+********************************************************
+
+The `csthesis' bundle contains the style file and the suppoting
+files for the Comp. Science, SFU thesis format under  LaTeX2e=20
+Copyright (C) 1998 Petr Pp Kubon
+
+MAIN FEATURES:
+***************
+
+The csthesis.sty package supercedes the existing format sfuthesis.sty=20
+in the following ways:
+
+  - it fully conforms to the most recent (1997) regulations on SFU =
+theses;
+  - it offers a visually pleasing design;
+  - it supports all optional thesis sections (Dedication, Quotation,
+    Preface, etc.) and simplifies their inclusion;
+  - it supports the TWOSIDE option of LaTeX and coordinates
+    it with two-sided printing---this is not allowed for the library
+    copies, but you should definitely consider it for other copies;
+  - it comes with a full documentation, describing all available
+    commands and identifying which parts of the code can be modified and
+    how to achieve specific effects (like adding/removing white space=20
+    between signatures on Approval page);
+  - it comes with two files, illustrating the use of the package in
+    writing theses.
+
+I) CONTENTS:
+**********
+
+READ.ME: copying and distribution limitations, installation =
+instructions,
+	 list of all files included in the distribution
+
+ChangeLog: list of bug fixes between versions
+csthesis.ins: the installation file for csthesis.sty
+csthesis.sty: the code of the package (produced from csthesis.ins)
+csthesis.dtx: documentation and code for csthesis.sty
+thes-full.tex: example of a full version of thesis (all optional parts
+  	       included); read also as a supplementary guide for
+	       using csthesis.sty=20
+thes-short.tex: example of a short version of thesis (only required =
+parts)
+
+doc/ directory:=20
+   csthesis.dvi: ready-made "printout" of csthesis.dtx
+   thes-full.dvi: ready-made "printout" of thes-full.tex
+   thes-short.dvi: ready-made "printout" of thes-short.tex
+
+files/ directory: auxiliary files used by example theses
+   titapp.tex: title and approval page information
+   abstract.tex: thesis abstract
+   dedquot.tex: dedication and quotation information (thes-full only)
+   ack.tex: acknowledgments
+   preface.tex: foreword (thes-full only)
+   one.tex: 1st chapter
+   two.tex: 2nd chapter
+   appone.tex: 1st appendix
+   apptwo.tex: 2nd appendix (thes-full only)
+   bibl.tex: bibliography
+   ind.tex: index (thes-full only)
+   thes-both.bib: bibliographical DB to be compiled with bibtex
+     =20
+II) INSTALLATION:
+*****************
+
+The bundle comes unpacked and ready-to-use, with all the documentation
+available for perusal. If you need to save space, the /doc directory
+and the csthesis.sty file can be deleted and later generated again by =
+the=20
+following method:
+
+1) 	latex csthesis.ins
+to produce csthesis.sty
+
+2) 	latex csthesis.dtx to=20
+produce the documentation for csthesis.sty.
+If you want index of commands and the history of changes, you need to
+run makeindex twice:
+	makeindex -s gind.ist csthesis
+	makeindex -s gglo.ist -o csthesis.gls csthesis.glo
+and then=20
+	latex csthesis.dtx=20
+again (you might need to run it twice).
+NOTE: You might run into problems with Makeindex not being able to find
+the .ist files. They are in the CSS latex distribution in /base; you =
+need
+to set the INDEXSTYLE environment variable to that directory (full =
+path).
+
+3) Move csthesis.sty to a directory included in TEXINPUTS.
+
+4) To see the output of the two example thesis files,=20
+	latex thes-short
+	bibtex thes-short
+	latex thes-short=20
+and
+	latex thes-full=20
+	bibtex thes-full
+The full version of the thesis  contains an index, so you should run =
+also
+	makeindex thes-full
+	latex thes-full (2x)
+
+III) COPYING AND DISTRIBUTION RESTRICTIONS
+********************************************
+
+All files in the `csthesis' bundle are copyright 1998 Petr Pp Kubon. =20
+
+Distribution of unchanged files is allowed provided that=20
+all the files listed in Section I are included.
+ =20
+The generation of changed versions of the files included in these
+packages is allowed as long as you:=20
+  - rename the file before you make any changes to it; =20
+  - change the error report address so that I do not get sent error
+    reports for files *not* maintained by myself.
+
+
+  The distribution of changed versions of the files included in these
+  packages is allowed under the restrictions listed in the file
+  legal.txt in the base LaTeX distribution.  In particular you should:=20
+
+  - also distribute the unmodified version of the file.
+
+IV) Reporting Bugs
+*******************
+
+If you wish to report a problem or bug in csthesis.sty,
+send a message to `petr@cs.sfu.ca'.
+
+When reporting bugs, please produce a small test file that shows the
+problem, and ensure that you are using the current version of the
+package, and of the base LaTeX software.
+
+</PRE></BODY></HTML>
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/blank.gif
+
+R0lGODlhFAAWAKEAAP///8z//wAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRoZSBwdWJsaWMgZG9t
+YWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIgMTk5NQAh+QQBAAAB
+ACwAAAAAFAAWAAACE4yPqcvtD6OctNqLs968+w+GSQEAOw==
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/back.gif
+
+R0lGODlhFAAWAMIAAP///8z//5mZmWZmZjMzMwAAAAAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRo
+ZSBwdWJsaWMgZG9tYWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIg
+MTk5NQAh+QQBAAABACwAAAAAFAAWAAADSxi63P4jEPJqEDNTu6LO3PVpnDdOFnaCkHQGBTcqRRxu
+WG0v+5LrNUZQ8QPqeMakkaZsFihOpyDajMCoOoJAGNVWkt7QVfzokc+LBAA7
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/text.gif
+
+R0lGODlhFAAWAMIAAP///8z//5mZmTMzMwAAAAAAAAAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRo
+ZSBwdWJsaWMgZG9tYWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIg
+MTk5NQAh+QQBAAABACwAAAAAFAAWAAADWDi6vPEwDECrnSO+aTvPEddVIriN1wVxROtSxBDPJwq7
+bo23luALhJqt8gtKbrsXBSgcEo2spBLAPDp7UKT02bxWRdrp94rtbpdZMrrr/A5+8LhPFpHajQkA
+Ow==
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/unknown.gif
+
+R0lGODlhFAAWAMIAAP///8z//5mZmTMzMwAAAAAAAAAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRo
+ZSBwdWJsaWMgZG9tYWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIg
+MTk5NQAh+QQBAAABACwAAAAAFAAWAAADaDi6vPEwDECrnSO+aTvPEQcIAmGaIrhR5XmKgMq1LkoM
+N7ECrjDWp52r0iPpJJ0KjUAq7SxLE+sI+9V8vycFiM0iLb2O80s8JcfVJJTaGYrZYPNby5Ov6Wol
+PD+XDJqAgSQ4EUCGQQEJADs=
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/folder.gif
+
+R0lGODlhFAAWAMIAAP/////Mmcz//5lmMzMzMwAAAAAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRo
+ZSBwdWJsaWMgZG9tYWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIg
+MTk5NQAh+QQBAAACACwAAAAAFAAWAAADVCi63P4wyklZufjOErrvRcR9ZKYpxUB6aokGQyzHKxyO
+9RoTV54PPJyPBewNSUXhcWc8soJOIjTaSVJhVphWxd3CeILUbDwmgMPmtHrNIyxM8Iw7AQA7
+
+------=_NextPart_000_0000_01CC7468.A38F4C80
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: http://www.cs.sfu.ca/icons/tex.gif
+
+R0lGODlhFAAWAMIAAP///8z//5mZmTMzMwAAAAAAAAAAAAAAACH+TlRoaXMgYXJ0IGlzIGluIHRo
+ZSBwdWJsaWMgZG9tYWluLiBLZXZpbiBIdWdoZXMsIGtldmluaEBlaXQuY29tLCBTZXB0ZW1iZXIg
+MTk5NQAh+QQBAAABACwAAAAAFAAWAAADbji6vPEwDECrnSO+aSkhAJdF02eaYTVuwHmmKsR1XzsQ
+980KpmC5H5arAxAYecKWkngkJFFEClJS+fiiRScVy9SWcJQbqDP9Arus6jhabgHXgHj7I6rF7+27
+fi/38v99aYB7ZQNHh4hGOhBvjVoJADs=
+
+------=_NextPart_000_0000_01CC7468.A38F4C80--

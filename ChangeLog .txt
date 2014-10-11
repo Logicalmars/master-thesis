@@ -1,0 +1,58 @@
+V1.26
+*****
+	
+2014-02-02  Ahmed Saad <aasaad@sfu.ca>
+	%%  2013: Updated title page title-cased, black bookmarking, new PCL page, Date on approval page, add tcp project file for TexnicCenter on windows platform. Changes are applied to thes-full.tex Ahmed Saad
+       %%  2014: change the font to Helvetica 10 which is an analogue to Arial. Changes are applied to thes-full.tex
+* Footnote 1 (Ch1), please change to "Please refer to http://www.lib.sfu.ca/theses to check for any changes to requirements."  (one.tex)
+       %% Footnote 1(Ch2) change 11pt to 10pt (two.tex)
+       %% Footnote 3 (Ch2) could you please change this text to say "This is now the accepted format for references."  (two.tex)
+       %% On the Appendix A page, would you change the comma after Appendices to a colon and capped the 's' in Sectioning (appone.tex)
+
+       %% We're not using caps anymore and there are small caps on the title page (a Thesis submitted in partical fulfillment...).  I'm hoping this can be changed to Title-Cased "Thesis Submitted in Partial Fulfillment of the Requirements for the Degree of" (no A at the beginning) ==> (csthesis.sty) 
+
+V1.25
+*****
+	
+2012-05-30  Juan Galvez <jgalvez@sfu.ca>
+	* Addition of Partial Copyright License
+
+V1.24
+*****
+	
+2011-12-20  Chris McIntosh <cmcintos@sfu.ca>
+	* Change to title page requested by Joanie Wolfe, Library
+
+V1.23
+*****
+	
+2010-08-12  Brian Kroeker <kroeker@cs.sfu.ca>
+	* Change to Copyright Notice requested by Penny Simpson, Library
+
+V1.22
+*****
+	
+2007-03-14  Brian Kroeker <kroeker@cs.sfu.ca>
+	* Change to library URL requested by Penny Simpson, Library
+
+V1.21
+*****
+	
+2006-03-07  Greg Baker  <ggbaker@cs.sfu.ca>
+	* Trivial change to approval page.
+
+V1.2
+****
+
+2003-08-10  Greg Baker  <ggbaker@lefty.cs.sfu.ca>
+
+	* added "Contents" reference to table of contents
+
+V1.1
+****
+
+Fri Apr 9 17:01:32 1999  Petr Kubon   <petr@cs.sfu.ca>
+
+     * csthesis.sty: Modified \@xfloat to make compatible with the
+     package color.sty (CTAN)
+

@@ -1,0 +1,85 @@
+%% Copyright 1998 Pepe Kubon
+%%
+%% `thes-short.tex' --- the example thesis, SHORT version, used
+%%                     with  the `csthesis' package 
+%% Use: latex thes-short to generate the DVI output, then 
+%%      bibtex thes-short to generate the bibliography
+%%      latex thes-short 
+%%
+%% You are allowed to distribute this file together with all files
+%% mentioned in READ.ME.
+%%
+%% You are not allowed to modify its contents.
+%%
+
+\documentclass[11pt]{report}
+%\documentclass[11pt,twoside]{report}%% for two-sided printing
+\usepackage{pdfpages} 
+\usepackage{anysize,fancyhdr,graphics}
+\usepackage{csthesis}
+\usepackage[titletoc]{appendix}%%Ensure word appendix appears in toc
+
+\begin{document}
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+%%% set switches
+%\contentspagefalse  
+%\figurespagetrue
+%\tablespagetrue
+%\dedicationpagetrue
+%\quotationpagetrue
+%\otherlistpagetrue
+
+%%% front matter 
+\include{files/titapp} %% title, approval
+
+%% Partial Copyright License (PCL)
+\newpage 			
+\addcontentsline{toc}{chapter}{Partial Copyright License}
+\mbox{}
+\makeatletter
+\AddToShipoutPictureBG*{
+            \setlength{\@tempdimc}{.06\paperheight}
+            \setlength{\unitlength}{1pt}
+           \put(\strip@pt\@tempdimb,\strip@pt\@tempdimc){
+	\includegraphics{PCL_Declaration_2011.pdf}
+	} 
+} 
+\makeatother
+\newpage
+
+\include{files/abstract} %% abstract
+\include{files/dedquot} %% dedication and quotation, if any 
+\include{files/ack} %%  acknowledgments
+
+%%%  generate contents, lists of figures, etc.
+\lists
+
+%%% prepare main section
+\beforetext
+
+%%% main matter
+\include{files/one} 
+\include{files/two}
+
+%%%  appendices, if any
+\begin{appendices}
+\include{files/appone}
+\end{appendices}
+
+%%%%%%  bibliography
+\include{files/bibl}
+
+
+\end{document}
+
+
+
+
+
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 

@@ -1,0 +1,58 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%     Chapter 2
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{LLVM Background}
+\label{two}
+
+Introduce LLVM and IR.
+
+\section{LLVM Target-Independent Code Generator}
+Introduce a little bit.
+Need to talk about selectionDAG
+
+LLVM as a modularized compiler tool chain, allows us to implement our optimization conveniently. As we discussed before, LLVM has a general code generation algorithm, the first stage is instruction selection, listed below\cite{llvm_code_gen}:
+
+\begin{itemize}
+  \item Initial SelectionDAG Construction: generate SelectionDAG from LLVM IR.
+  \item DAG Combine 1
+  \item Legalize Types Phase
+  \item Post Legalize Type DAG Combine
+  \item Legalize Phase
+  \item DAG Combine 2
+  \item Instruction Select Phase
+  \item Scheduling and Formation Phase
+\end{itemize}
+
+We can see there are DAG combine passes after the initial construction and each legalize phase\cite{llvm_code_gen}. DAG combine passes optimize selectionDAG with both general and machine-dependent strategies, making the work easier for initial constructor and legalizers: they can focus on generating accurate selectionDAG, good and legal operations with no worries of messy output.
+
+The other advantage of DAG combiner is, you can choose the combine timing on your own. If you choose to combine before Legalize Types Phase, you can freely introduce illegal types into your combined results. This is different from legalizing phases. Generally speaking, you cannot introduce illegal types in Legalize Type Phase and cannot introduce illegal operations in Legalize Phase. This puts a limitation on machine-independent legalize strategies: $i8$ is the minimum integer type on X86 arch, programmer needs to extend every integer less than 8 bits to $i8$ before returning it to the DAG.
+
+For each target, LLVM has a specific target lowering class, e.g.\ X86ISelLowering for X86 arch. We put our code generation logic here as a DAG combiner. For each shufflevector node, we check if the mask matches certain pattern, say consecutive odd numbers from 1 to 31, then we combine the node into a tree of operations, say X86ISD::PACKUS and logic/shifting.
+
+\subsection{Legalization}
+SIMD operations exploit data parallelism by performing the same operation on different data at the same time. Those data are grouped together as vectors. LLVM uses the notion \verb|<N x iX>| to represent a vector of N elements, where each of the element is an integer of X bits \cite{llvm_lang_ref, hybrid_simd_type_legalize}. \verb|<N x iX>| is also denoted as $vNiX$ as $vNiX$ is the internal name used in LLVM source code; e.g.\ \verb|<4 x i32>| is the same with $v4i32$.
+
+In LLVM IR, programmer can write any kind of vectors, even $v1024i3$, and those vectors may not be supported by the target machine. LLVM has the notion of a "legal" vs. "illegal". A type is legal for a target only if it is supported by some operation. In selectionDAG, a DAG node is legal only if the target supports the operation and operands type. For example, $v16i8$ is legal on X86 SSE2 architecture, since the architecture supports ADD on 2 $v16i8$ vectors; but it does not support multiplication on 2 $v16i8$ vectors, so that the DAG node MUL on $v16i8$ is illegal. LLVM has legalize types and legalize operations phases to turn illegal type or DAG into legal\cite{llvm_code_gen}.
+
+Legalize type phase has three ways to legalize vector types\cite{hybrid_simd_type_legalize}: \textit{Scalarization}, \textit{Vector Widening} and \textit{Vector Element Promotion}.
+
+\begin{itemize}
+    \item \textbf{Scalarization} splits the vector into multiple scalars. It is often used for $v1iX$ as the edge case when LLVM is trying to split the incoming vector into sub vectors.
+    \item \textbf{Vector Widening} adds dummy elements to make the vector fit the right register size. It will not change the type of the elements, e.g.\ $v4i8$ to $v16i8$.
+    \item \textbf{Vector Element Promotion} preserves the number of elements, but promote the element type to a wider size, e.g.\ $v4i8$ to $v4i32$.
+\end{itemize}
+
+None of these strategies would legalize small element vectors properly. Think about $v32i1$, it fits in the general 32-bit registers, and we can not benefit from extending or splitting the vector in wider or more registers, not to mention scalarizing it. It would be the best to store $v32i1$ vectors just in the general 32-bit register and properly handle the operations on them.
+
+After type legalization, we may still have illegal DAG node, such as multiplication on $v16i8$ for X86 SSE2 architecture; thus we need legalize operations phase. There are three strategies in this phase:
+
+\begin{itemize}
+    \item \textbf{Expansion}: Use another sequence of operations to emulate the operation. Expansion strategy is often general.
+    \item \textbf{Promotion}: Promote the operand type to a larger type that support the operation.
+    \item \textbf{Custom}: Write a target-specific code to implement the legalization. Similar to Expansion, but with a specific target in mind.
+\end{itemize}
+
+When talk about Parabix background, talk about IDISA and "bitcast".

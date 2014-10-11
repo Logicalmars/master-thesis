@@ -1,0 +1,68 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%     Chapter 3
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Shufflevector Instruction}
+\label{three}
+
+Shufflevector is a powerful LLVM instruction that can be used to manipulate vectors in a target-independent fashion. Its syntax is \cite{llvm_lang_ref}:
+
+\begin{verbatim}
+    <result> = shufflevector <n x <ty>> <v1>, <n x <ty>> <v2>, <m x i32> <mask>
+    ; yields <m x <ty>>
+\end{verbatim}
+
+The first two operands are vectors of the same type and their elements are numbered from left to right across the boundary. In the other word, the element indexes are $0$ \ldots $n-1$ for {\tt v1} and $n$ \ldots $2n-1$ for {\tt v2}. The {\tt mask} is an array of constant integer indexes, which indicates the elements we want to extract to form the {\tt result}. Either {\tt v1} or {\tt v2} can be "undefined" to do shuffle within one vector.
+
+With shufflevector, we can express IDISA functions like \verb|hsimd::packh|, \verb|hsimd::packl| in "pure" IR. "Pure" here means machine-independent. For an example, \verb|hsimd<16>::packh(A, B)| extracts the high 8 bits of each field in A and B, concatenates them together to form the result vector. (Maybe a pic here). In traditional C++ library, we have to realize this operation for each platform: we use unsigned saturation $packuswb$ for X86 arch and use $vuzpq\_u8$ for NEON arch; both require some tweak on operands A, B. On the contrary, we can write \verb|hsimd<16>::packh| for all the platforms as Program~\ref{program:packh_16}.
+
+\begin{program}
+\begin{verbatim}
+define <4 x i32> @packh_16(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <16 x i8>
+  %bb = bitcast <4 x i32> %b to <16 x i8>
+  %rr = shufflevector <16 x i8> %bb, <16 x i8> %aa, <16 x i32> <i32 1, i32 3,
+        i32 5, i32 7, i32 9, i32 11, i32 13, i32 15, i32 17, i32 19, i32 21,
+        i32 23, i32 25, i32 27, i32 29, i32 31>
+
+  %rr1 = bitcast <16 x i8> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+\end{verbatim}
+\caption[Shufflevector implementation of packh.]{Shufflevector implementation of packh, it is machine independent. {\tt <4 x i32>} is a general vector type we use for all SIMD registers to simplify function interface.}
+\label{program:packh_16}
+\end{program}
+
+In this program, we first bitcast operands into $i8$ vectors. "Bitcast" is also an useful LLVM operation that converts between integer, vector and FP-values; it changes the data type without moving or modifying the data; so it requires the source and result type to have the same bit size. We then fill in the indexes of all the high bits in order, which is 1, 3, \ldots, 31. (MB Pic). Target-specific logic is thus left to the LLVM backend and is no longer the burden of the programmer. We optimize LLVM backend for better code generation later in this thesis.
+
+Shufflevector can be used for a variety of operations, e.g.\ for \verb|hsimd<16>::packl|, which packs all the low bits of each 16-bit field, we just change the mask to be 0, 2, 4, 6, \ldots, 30; for {\tt packh} with different field width $w$, we can first bitcast the operands into vectors of $w/2$ element, and then shuffle with the similar increasing odd number mask. We also write the code of \verb|esimd<8>::mergeh| in Program~\ref{program:mergeh_8}, where the function is self-explanatory and any programmer who understands shufflevector can understand it easily.
+
+\begin{program}
+\begin{verbatim}
+define <4 x i32> @mergeh_8(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <16 x i8>
+  %bb = bitcast <4 x i32> %b to <16 x i8>
+  %rr = shufflevector <16 x i8> %bb, <16 x i8> %aa, <16 x i32> <i32 8,
+        i32 24, i32 9, i32 25, i32 10, i32 26, i32 11, i32 27, i32 12,
+        i32 28, i32 13, i32 29, i32 14, i32 30, i32 15, i32 31>
+
+  %rr1 = bitcast <16 x i8> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+\end{verbatim}
+\caption[Shufflevector implementation of mergeh.]{Shufflevector implementation of mergeh, the function is self-explanatory and easy to understand.}
+\label{program:mergeh_8}
+\end{program}
+
+However, the shufflevector has one limitation: the {\tt mask} can only contain constant integers, which prevents us from generating dynamic shuffle operation. Parabix deletion algorithm, for instance, takes two SIMD registers as input: A and DeletionMask. It will delete the bits from A marked by DeletionMask (delete the $i_{th}$ bit of A if $\text{DeletionMask}_i = 1$) and shift the rest of A to the lower end. (MB Pic) This algorithm cannot be implemented in shufflevector because DeletionMask is not a constant. Given a DeletionMask, one can construct a shuffle mask to do both deletion and shifting, but LLVM does not support dynamic shuffle masks generated during the runtime.
+
+\section{Efficient Code Generation}
+(UNDER CONSTRUCTION)
+
+(May need to be moved into implementation. For here, just give examples of custom lowering)
+
+Shufflevector is a powerful instruction, but it's not supported directly by the hardware yet. So machine-specific code generation is necessary.
