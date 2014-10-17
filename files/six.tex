@@ -71,21 +71,21 @@ Further more, from the reciprocal throughput comparison (Figure~\ref{figure:thro
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=140mm]{draw/reciprocal_throughput_vector.png}
-\caption[Reciprocal Instruction Throughput Against IDISA Library]{Reciprocal instruction throughput against IDISA library. IR and IDISA share almost identical throughput.}
+\caption[Reciprocal instruction throughput against IDISA library]{Reciprocal instruction throughput against IDISA library. IR and IDISA share almost identical throughput.}
 \label{figure:throughput_vector}
 \end{figure}
 
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=140mm]{draw/cpu_cycles_vector.png}
-\caption[Total CPU Cycles Against IDISA Library]{Total CPU cycles against IDISA library}
+\caption[Total CPU cycles against IDISA library]{Total CPU cycles against IDISA library; for $i1$ and $i4$ vectors, IR library has the similar performance with IDISA but it performs better with $i2$ vectors, especially on integer comparison.}
 \label{figure:cpu_cycles_vector}
 \end{figure}
 
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=140mm]{draw/loop_vector_i2.png}
-\caption[Vector Of $i2$ Tested In A Loop]{The same benchmark for $i2$ vectors with the instruction in a loop. Code in Figure~\ref{figure:cpu_cycles_vector} can be seen as the flattened version of this figure. We find IDISA here wins in the multiplication on $i2$, while IR wins it in Figure~\ref{figure:cpu_cycles_vector}. Loop optimization should be responsible for it.}
+\caption[Vector of $i2$ tested in a loop]{The same benchmark for $i2$ vectors with the instruction in a loop. Code in Figure~\ref{figure:cpu_cycles_vector} can be seen as the flattened version of this figure. We find IDISA here wins in the multiplication on $i2$, while IR wins it in Figure~\ref{figure:cpu_cycles_vector}. Loop optimization should be responsible for it.}
 \label{figure:loop_vector_i2}
 \end{figure}
 
@@ -106,12 +106,12 @@ gt   & X    & X    & X    & 1\\ \hline
 ult  & 349  & X    & X    & 1\\ \hline
 ugt  & 290  & X    & X    & 1\\ \hline
 \end{tabular}
-\caption[Performance Against LLVM Native Support for $i2^k$ Vectors]{Performance against LLVM native support of $i2^k$ vectors. `X' means compile error or compile too slowly (longer than 30s), the rest number means the ratio of CPU cycles against our lowering: add takes 302 times of the cycles that our lowering needs. For $i8$, we apply inductive doubling strategy on the multiplication, which explains the 10 times speed up. }
+\caption[Performance against LLVM native support for $i2^k$ vectors]{Performance against LLVM native support of $i2^k$ vectors. `X' means compile error or compile too slowly (longer than 30s), the rest number means the ratio of CPU cycles speed up: add takes 302 times of cycles that our lowering needs. For $i8$, we apply inductive doubling strategy on the multiplication, which explains the 10 times speed up. }
 \label{table:vector_perf_LLVM}
 \end{table}
 
 \section{Parabix Critical Operations}
-In this section, we evaluate our work by replacing Parabix critical operations with the IR library. We first choose transposition and reverse transposition as two representative operations and measure performance in two Parabix applications: XML validator and UTF-8 to UTF-16 transcoder. Note that we did not rewrite the whole application with an IR library, part of the application is still IDISA but some critical operation is replaced. The default compile flag is to use Intel SSE2 instruction set and 64 bit.
+In this section, we evaluate our work by replacing Parabix critical operations with the IR library. We first choose transposition and inverse transposition as two representative operations and measure performance in two Parabix applications: XML validator and UTF-8 to UTF-16 transcoder. Note that we did not rewrite the whole application with an IR library, part of the application is still IDISA but some critical operation is replaced. The default compile flag is to use Intel SSE2 instruction set and 64 bit.
 
 \begin{table}[h]
 \centering
@@ -124,7 +124,7 @@ xmlwf0 on Haswell   &  3.929   &   4.363   &   4.554   &   4.876   &   5.178 \\ 
 xmlwf1   &  3.929   &   4.371   &   4.566   &   4.861   &   5.186 \\ \hline
 xmlwf1 on Haswell &   3.566   &   3.978   &   4.163   &   4.451   &   4.787 \\ \hline
 \end{tabular}
-\caption[Performance Comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf), in thousand CPU cycles per thousand byte. In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is a copy of xmlwf0 with the transposition replaced.}
+\caption[Performance comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf), in thousand CPU cycles per thousand byte. In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is a copy of xmlwf0 with the transposition replaced.}
 \label{table:xmlwf_perf}
 \end{table}
 
@@ -138,7 +138,7 @@ xmlwf1 on Haswell &   3.566   &   3.978   &   4.163   &   4.451   &   4.787 \\ \
  U8u16\_1         & 284.17  & 36.71   & 41.65       & 255.57 & 10.6     \\ \hline
  U8u16\_1 Haswell & 267.14  & 34.64   & 38.53       & 237.66 & 9.98     \\ \hline
  \end{tabular}
- \caption[Performance Comparison of UTF-8 UTF-16 Transcoder]{Performance comparison of UTF-8 UTF-16 transcoder, in million CPU cycles. U8u16\_0 is written in IDISA, U8u16\_1 has the transposition and reverse transposition part replaced.}
+ \caption[Performance comparison of UTF-8 UTF-16 Transcoder]{Performance comparison of UTF-8 UTF-16 transcoder, in million CPU cycles. U8u16\_0 is written in IDISA, U8u16\_1 has the transposition and inverse transposition part replaced.}
  \label{table:u8u16_perf}
  \end{table}
 
@@ -146,7 +146,7 @@ Table~\ref{table:xmlwf_perf} shows the performance of the XML Validator. The onl
 
 Another interesting observation is, when we re-compiled the same code on the Intel Haswell platform, we got almost no improvement for xmlwf0, since the IDISA library linked in is written with SSE2 intrinsics and only SSE2 instructions can be generated; but we got a slightly better performance for xmlwf1, because the IR library is target-independent and LLVM backend knows other instruction sets like SSE3, SSE4 is available on this platform, it generates better code with them.
 
-Similar performance data on UTF-8 to UTF-16 transcoder is listed in Table~\ref{table:u8u16_perf}. U8u16\_0 is written in IDISA and U8u16\_1 has both the transposition and reverse transposition part replaced. We also tried to compile them on the full Haswell, which gave us similar performance benefit.
+Similar performance data on UTF-8 to UTF-16 transcoder is listed in Table~\ref{table:u8u16_perf}. U8u16\_0 is written in IDISA and U8u16\_1 has both the transposition and inverse transposition part replaced. We also tried to compile them on the full Haswell, which gave us similar performance benefit.
 
 \subsection{Ideal 3-Stage Transposition on the Intel Haswell}
 Intel Haswell architecture introduces PEXT operation which can be used for the ideal 3-stage transposition. We evaluated its performance in Table~\ref{table:PEXT_transposition}. We can see the performance drops with PEXT, but the major reason is that PEXT can only work on $i32$ or $i64$ integer for the current architecture, not the algorithm. As the hardware evolves, we may have PEXT on SIMD registers directly and we can expect a better performance in xmlwf2, may be better than both xmlwf0 and xmlwf1 since 3-stage transposition is proved to be optimal under the IDISA model \cite{inductive_doubling_principle}. Our approach provides a new chance to exploit future hardware benefit without changing the source code.
@@ -165,9 +165,31 @@ xmlwf2 on Haswell & 4.11   &    4.49   &    4.69   &    4.978   &   5.308 \\ \hl
 \end{table}
 
 \subsection{Long Stream Addition}
-In this section, we would first show application level performance result of icgrep, which is an tool for regular expression matching with bitwise data parallelism. We compared results with is listed in Figure~\ref{figure:icgrep}. The overall performance
+We replaced the internal logic of big integer addition in Chapter~\ref{four} and introduced a new intrinsic: {\tt uadd.with.overflow.carryin}. We would evaluate them in this section by first comparing the long-stream addition algorithm with LLVM's original implementation and then doing some application level profile for the new intrinsic.
 
-We added a new LLVM intrinsic for the addition with carry-in and carry-out bit.
+We wrote micro benchmark with Dr. Fog's test program and we put 200 independent additions on $i128$ and $i256$. It was tricky to make the test program right, we generated random data for the operands and we carefully inserted the carry-out bit back to the return value so that our long stream addition logic would not be optimized away. In order to be consistent throughout the comparison, we used the same compiler flag for all the runs ({\tt -mavx2} for gcc and {\tt -mattr=+avx2,+bmi2} for LLVM tool chain). The result is listed in Table~\ref{table:lsadd_micro}.
 
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|}
+\hline
+                             & Core CPU Cycles & Instructions \\ \hline
+Long stream addition on $i128$ & 3043            & 7952         \\ \hline
+LLVM on $i128$                 & 1455            & 4199         \\ \hline
+Long stream addition on $i256$ & 4103            & 10152        \\ \hline
+LLVM on $i256$                 & 4234            & 9798         \\ \hline
+\end{tabular}
+\caption{Micro benchmark for long stream addition against LLVM's original implementation.}
+\label{table:lsadd_micro}
+\end{table}
 
+Long stream addition does not perform well on $i128$, since there is only two sequential additions involved (1 $addq$ and 1 $adcq$) and parallel computing would not save much but introduce complexity. However, we can see on $i256$ long stream addition has almost identical performance with the sequential implementation, which generates 1 $addq$ and 3 $adcq$. As the width of the operand doubles, the CPU cycles from LLVM increases to the rate of 2.91, while in the long stream addition, the rate is only 1.35, under 2; thus we could confidently predict that on the Intel AVX512, long stream addition on $i512$ would perform better than the sequential addition.
 
+We then show application level profile of `icgrep' which is an tool for regular expression matching with bitwise data parallelism. We replaced the internal "add with carry" logic with one single intrinsic and plotted the performance in Figure~\ref{figure:lsadd_icgrep}. We can see the performance drops because that version of icgrep works with 128-bit SIMD registers and long stream addition does not work well on $i128$. We could expect better performance on wider SIMD registers.
+
+\begin{figure}[ht!]
+\centering
+\includegraphics[width=140mm]{draw/lsadd_icgrep.png}
+\caption[Performance of icgrep with long stream addition]{Performance of icgrep with long stream addition. This version of icgrep is based on $i128$ so long stream addition actually slows down the performance; but for wider SIMD register, it would get the same performance or even better. For different regular expressions, the portion of "add with carry" code can be different, which explains the difference of the relative cycles across the x axis.}
+\label{figure:lsadd_icgrep}
+\end{figure}
