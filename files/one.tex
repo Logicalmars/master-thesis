@@ -36,7 +36,7 @@ This motivates us to find a better backend and currently, the most promising bac
 However, the native backend of LLVM does not support parallel bit streams very well. Important SIMD type of 2-bit and 4-bit field width are not available and 1-bit field width is supported slowly. Packing high bits on 16-bit field width which is one of the four key elements in the IDISA model and critical for transposition does not lower to proper machine code on X86. In this thesis, we extend LLVM to systematically support parallel bit streams. We make the following contributions:
 
 \begin{itemize}
-  \item We redefine type legality in LLVM and extend LLVM type system so that vectors of small element type get properly supported.
+  \item We redefine type legality in LLVM and extend LLVM type system with the inductive doubling principle so that vectors of small element type get properly supported.
   \item We insert logic in the LLVM backend to recognize and handle Parabix operations to have efficient code generation while keeping the whole source code in target-independent IR.
   \item We evaluate the new LLVM backend with both micro benchmarks on single Parabix operation and application level profile. We get the performance on X86 platform as good as the well-tuned IDISA library.
 \end{itemize}

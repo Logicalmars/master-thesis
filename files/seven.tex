@@ -8,3 +8,5 @@
 \label{seven}
 
 In this thesis, we demonstrated that it is possible to extend LLVM type system to support Parabix technology. We have shown systematic support of the vector of $i2^k$ and support of critical Parabix operations in the target-independent IR library. We have also shown in one specific target: Intel X86, we can generate efficient native code. We added a new LLVM intrinsic that enables chained additions on long bit streams, which can be used for a broad category of applications.
+
+LLVM as a compiler tool chain is gaining popularity recently and it is a good tool for parallel bit streams (Parabix), because first it provides a machine-independent intermediate representation (IR) as its virtual instruction set so the code portability can be easily achieved; second it supports interprocedural optimizations that are aware of both the target and the context of certain Parabix operation that enables better machine code generation; third it provides just-in-time compiling facility to support run-time source generation which is important for regular expression matching.
