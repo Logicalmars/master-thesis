@@ -161,7 +161,7 @@ static SDValue GENLowerADD(SDValue Op, SelectionDAG &DAG) {
 \label{program:genloweradd}
 \end{program}
 
-\subsection{Inductive Doubling Principle}
+\subsection{Inductive Doubling Principle For $i4$ Vector}
 Now we have better code generation for $vXi1$ and $vXi2$, $vXi4$ vectors are our next optimization target. Shufflevectors of $vXi4$ are used in \verb|hsimd<8>::packh|, \verb|hsimd<8>::packl| and \verb|esimd<4>::mergeh|, which are required by Ideal Three-Stage Transposition / Inverse Transposition; $vXi4$ is also the critical part of the IDISA model. But unfortunately, the strategies discussed above cannot be applied to $vXi4$ efficiently.
 
 Circuit Minimization Problem is NP-hard\cite{wiki_quine, kabanets2000circuit}. For $vXi4$, we would have 4 boolean functions of 8 variables: $c_i = f_i(a_0, a_1, a_2, a_3, b_0, b_1, b_2, b_3), i \in \left\{{0, 1, 2, 3}\right\}$, and it is known that most boolean functions on $n$ variables have circuit complexity at least $2^n/n$\cite{kabanets2000circuit} and we need 1-bit, 2-bit, 3-bit shifting on $A$, $B$. So the framework on $vXi2$ could not generate efficient code for us at this time. Instead, we introduce \textit{Inductive Doubling Principle} \cite{inductive_doubling_principle} and we will show that this general principle can be applied for $vXi4$ and even wider vector element type, e.g.\ multiplication on $v16i8$, to get better performance.
@@ -187,15 +187,7 @@ C = IFH1(HiMask_8, A \land HiMask_8 + B \land HiMask_8, A + B) \\
 HiMask_8 = (1111000011110000 \ldots 11110000)_2
 \end{gather}
 
-Generally, as Dr Cameron wrote, "inductive doubling refers to a general property of certain kinds of algorithm that systematically double the values of field widths or other data attributes with each iteration."\cite{inductive_doubling_principle}. He described four key elements of this architecture:
-\begin{itemize}
-    \item A core set of binary functions on $iX$ vectors, for all $X = 2^k$. To work with parallel bit streams, the operation ADD, SUB, SHL, SRL and ROTL (rotate left) comprise the set.
-    \item A set of \textit{half-operand modifiers} that make possible the inductive processing of $i2X$ in terms of combinations of $iX$. These modifiers select either the lower $X$ bits of each $i2X$ element or the higher $X$ bits.
-    \item Packing operations that compress two {\tt <N x iX>} vectors into one {\tt <2N x i(X/2)>} vector. Like {\tt hsimd<8>::packh} we mentioned in Chapter~\ref{three}.
-    \item Merging operations that produce one {\tt <N x iX>} vector from two {\tt <2N x i(X/2)>} vectors. Like {\tt esimd<8>::mergeh}, it is the inverse function of packing.
-\end{itemize}
-
-For this section, we will only use the fact that we can emulate SIMD operations on $iX$ vectors with $iX/2$ or $i2X$ vector operations. We implemented all the operations on $vXi4$ with this principle and the algorithm is listed in Table~\ref{table:vXi4}. One thing needs explain is SETCC, which is the internal representation of integer comparison in LLVM\@. It has a third operand to determine comparison type, such as SETEQ (equal), SETLT (signed less than), and SETUGE (unsigned greater or equal to). The third operand preserves in our algorithm.
+So we can emulate SIMD operations on $iX$ vectors with $iX/2$ or $i2X$ vector operations. We implemented all the operations on $vXi4$ with this principle and the algorithm is listed in Table~\ref{table:vXi4}. One thing needs to explain is SETCC, which is the internal representation of integer comparison in LLVM\@. It has a third operand to determine comparison type, such as SETEQ (equal), SETLT (signed less than), and SETUGE (unsigned greater or equal to). The third operand preserves in our algorithm.
 
 \begin{table}[h]
 \centering
