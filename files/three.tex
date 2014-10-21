@@ -7,8 +7,39 @@
 \chapter{Design Objectives}
 \label{three}
 
+In this chapter we will discuss about our overall principles for using LLVM as a new Parabix backend. The principles are:
 
-Shufflevector is a powerful LLVM instruction that can be used to manipulate vectors in a target-independent fashion. Its syntax is \cite{llvm_lang_ref}:
+\begin{itemize}
+    \item Express Parabix operations in the semantics preserving IR or LLVM intrinsics.
+    \item Move the implementation of SIMD operations to the backend level.
+\end{itemize}
+
+\section{Express Parabix Operations}
+
+LLVM has type system built in its low-level representation thus preserving static information for the backend. Common operations like addition and shifting on SIMD registers have direct IR instruction like \verb|add <32 x i4> %a, %b| and \verb|shl <4 x i32> %a, <4 x i32> <i32 1, i32 1, i32 1, i32 1>| which is immediate shifting left with 1 bit. Our principle is important when there are two possible ways to express one operations, for example {\tt IFH1}.
+
+{\tt IFH1(Mask, A, B)} selects bits from vector {\tt A} and {\tt B} according to the {\tt Mask}. If the $i_{th}$ bit of {\tt Mask} is $1$, $\text{\tt A}_i$ is selected, otherwise $\text{\tt B}_i$ is selected. {\tt IFH1(Mask, A, B)} simply equals to $(\text{\tt Mask} \land \text{\tt A}) \lor (\lnot \text{\tt Mask} \land \text{\tt B})$ and we can write a function in LLVM like Program~\ref{program:ifh1}. But LLVM provides a more precise IR primitive called select and {\tt IFH1} is just equivalent to {\tt select <128 x i1> \%Mask, <128 x i1> \%A, <128 x i1> \%B}. Our principle prefers the latter expression since it preserves more information.
+
+A similar example would be the addition with carry-in and carry-out bits on arbitrary integer, which we primarily work with $i128$ and $i256$. A function would be written for it but we prefer the native LLVM intrinsic {\tt uadd.with.overflow} for unsigned addition with carry-out bits. We even create a new intrinsic called {\tt uadd.with.overflow.carryin} to take the carry-in bit into computation.
+
+\begin{program}
+  \begin{verbatim}
+    define <4 x i32> @ifh_1(<4 x i32> %cond, <4 x i32> %b, <4 x i32> %c) {
+    entry:
+       %not_cond = xor <4 x i32> %cond, <i32 -1, i32 -1, i32 -1, i32 -1>
+
+       %t0 = and <4 x i32> %cond, %b
+       %t1 = and <4 x i32> %not_cond, %c
+       %r = or <4 x i32> %t0, %t1
+       ret <4 x i32> %r
+    }
+  \end{verbatim}
+  \caption{LLVM function for {\tt IFH1}.}
+  \label{program:ifh1}
+\end{program}
+
+\subsection{Express with Shufflevector}
+To express a large portion of Parabix operations, we need to introduce one powerful LLVM primitive: shufflevector. It can be used to manipulate vectors in a target-independent fashion. Its syntax is \cite{llvm_lang_ref}:
 
 \begin{verbatim}
     <result> = shufflevector <n x <ty>> <v1>, <n x <ty>> <v2>, <m x i32> <mask>
@@ -17,7 +48,7 @@ Shufflevector is a powerful LLVM instruction that can be used to manipulate vect
 
 The first two operands are vectors of the same type and their elements are numbered from left to right across the boundary. In the other word, the element indexes are $0$ \ldots $n-1$ for {\tt v1} and $n$ \ldots $2n-1$ for {\tt v2}. The {\tt mask} is an array of constant integer indexes, which indicates the elements we want to extract to form the {\tt result}. Either {\tt v1} or {\tt v2} can be "undefined" to do shuffle within one vector.
 
-With shufflevector, we can express IDISA functions like \verb|hsimd::packh|, \verb|hsimd::packl| in "pure" IR. "Pure" here means machine-independent. For an example, \verb|hsimd<16>::packh(A, B)| extracts the high 8 bits of each field in A and B, concatenates them together to form the result vector. (Maybe a pic here). In traditional C++ library, we have to realize this operation for each platform: we use unsigned saturation $packuswb$ for X86 arch and use $vuzpq\_u8$ for NEON arch; both require some tweak on operands A, B. On the contrary, we can write \verb|hsimd<16>::packh| for all the platforms as Program~\ref{program:packh_16}.
+With shufflevector, we can express IDISA functions like \verb|hsimd::packh|, \verb|hsimd::packl| in "pure" IR. "Pure" here means machine-independent. For an example, \verb|hsimd<16>::packh(A, B)| extracts the high 8 bits of each field in A and B, concatenates them together to form the result vector. (Maybe a pic here). In traditional C++ library, we have to realize this operation for each platform: we use unsigned saturation $packuswb$ for X86 SSE2 and use $vuzpq\_u8$ for NEON; both require some tweak on operands A, B. On the contrary, we can write \verb|hsimd<16>::packh| for all the platforms as Program~\ref{program:packh_16}.
 
 \begin{program}
 \begin{verbatim}
@@ -61,9 +92,8 @@ entry:
 
 However, the shufflevector has one limitation: the {\tt mask} can only contain constant integers, which prevents us from generating dynamic shuffle operation. Parabix deletion algorithm, for instance, takes two SIMD registers as input: A and DeletionMask. It will delete the bits from A marked by DeletionMask (delete the $i_{th}$ bit of A if $\text{DeletionMask}_i = 1$) and shift the rest of A to the lower end. (MB Pic) This algorithm cannot be implemented in shufflevector because DeletionMask is not a constant. Given a DeletionMask, one can construct a shuffle mask to do both deletion and shifting, but LLVM does not support dynamic shuffle masks generated during the runtime.
 
-\section{Efficient Code Generation}
-(UNDER CONSTRUCTION)
+\section{Move SIMD Implementation Into Backend}
 
-(May need to be moved into implementation. For here, just give examples of custom lowering)
+This is our second principle and it is the nature complement of the first principle. Instructions with accurate semantics like shufflevector are powerful, but may not be supported directly by the hardware yet. We move all the implementation knowledge we gained from the IDISA library into the LLVM backend and this implementation have to be mostly target-dependent for the better performance. We will discuss in greater detail in Chapter~\ref{four} and Chapter~\ref{five} of how individual operations are lowered in our backend.
 
-Shufflevector is a powerful instruction, but it's not supported directly by the hardware yet. So machine-specific code generation is necessary.
+With these two principles, we get a big picture of optimization framework like this: each building bricks of Parabix operation are coded with sufficient semantics which would allow the compiler front end to optimize with enough context information while the backend would optimize on top of SelectionDAG generated within the scope of a single function, the same scope of the IDISA generator.

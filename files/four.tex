@@ -114,9 +114,7 @@ Lowering $vXi2$ is harder than $vXi1$, so we propose a systematic framework usin
   \label{table:quine}
 \end{table}
 
-Once we get the minimized boolean functions, we can apply it onto the whole $vXi2$ vector. Let us introduce one operation first, {\tt IFH1}. {\tt IFH1(Mask, A, B)} selects bits from vector {\tt A} and {\tt B} according to the {\tt Mask}. If the $i_{th}$ bit of {\tt Mask} is $1$, $\text{\tt A}_i$ is selected, otherwise $\text{\tt B}_i$ is selected. {\tt IFH1(Mask, A, B)} simply equals to $(\text{\tt Mask} \land \text{\tt A}) \lor (\lnot \text{\tt Mask} \land \text{\tt B})$.
-
-Then if we have calculated the all high bits ($c_0$ for all the element) and low bits ($c_1$ for all the element), we can combine them with {\tt IFH1} with special {\tt HiMask}, which equals to $101010 \ldots 10$, 128 bits long in binary. To calculate all the high bits of each $i2$ element, we bitcast A, B into full register type (e.g.\ $v32i1$ to $i32$, $v64i2$ to $i128$ or $v2i64$) and then do the following substitution on the minimized boolean functions:
+Once we get the minimized boolean functions, we can apply it onto the whole $vXi2$ vector. Recall the function {\tt IFH1} we defined in Chapter~\ref{three}, if we have calculated the all high bits ($c_0$ for all the element) and low bits ($c_1$ for all the element), we can combine them with {\tt IFH1} with special {\tt HiMask}, which equals to $101010 \ldots 10$, 128 bits long in binary. To calculate all the high bits of each $i2$ element, we bitcast A, B into full register type (e.g.\ $v32i1$ to $i32$, $v64i2$ to $i128$ or $v2i64$) and then do the following substitution on the minimized boolean functions:
 
 \begin{itemize}
     \item For $a_0$ and $b_0$, replace it with $A$ and $B$.

@@ -17,7 +17,7 @@ However, since the SWAR instruction sets for different platforms are developed i
 \subsection{Commercial SIMD Instructions Sets}
 Some of the popular SIMD instructions sets are listed here:
 \begin{itemize}
-  \item Intel MultiMedia eXtension (MMX). It defines eight 64-bit registers known as MMO to MM7 which are aliases of the existing IA-32 Floating-Point Unit (FPU) stack registers. MMX only provides integer operations for early graphical applications thus is not a general purpose instruction set for SIMD programming \cite{hua_idisa}.
+  \item Intel MultiMedia eXtension (MMX). It defines eight 64-bit registers known as MM0 to MM7 which are aliases of the existing IA-32 Floating-Point Unit (FPU) stack registers. MMX only provides integer operations for early graphical applications thus is not a general purpose instruction set for SIMD programming \cite{hua_idisa}.
   \item Intel Streaming SIMD Extensions (SSE) series. SSE extends the MMX instructions set and introduces eight new independent 128-bit SIMD registers known as XMM0 to XMM7. Its successor SSE2 adds a rich set of integer instructions to the 128-bit XMM registers which makes it a useful SIMD programming model. AMD added support for SSE2 in its AMD64 architecture soon after the Intel released SSE2 thus in effect making SSE2 broadly available across the desktop computers. We would use SSE2 as our main instructions set target for 128-bit registers. Intel then released SSE3, SSSE3, SSE4 and AMD released SSE4a as the following SSE generations.
   \item Intel Advanced Vector Extensions (AVX). AVX extends the size of SIMD registers from 128 bits to 256 bits and introduces 16 new registers YMM0 to YMM15. It fully supports SSE instructions and more importantly, shifts the two-operand operations towards the non-destructive three-operand form, which would preserve the content in operand registers and reduce the potential movement of data between registers. AVX supports a number of floating point operations on 256-bit registers and its successor AVX2 fills the gap of integer operations and ensures the transition from SSE to AVX instructions with the same programming model. AVX2 is available on the Intel Haswell architecture, and we use it as our main 256-bit target. AVX512 as the next generation AVX has been announced to support 512-bit SIMD registers.
   \item ARM NEON\@. ARM as a popular mobile platform introduces its own SIMD extension named NEON in their Cortex-A series processors. It has thirty-two 64-bit registers (D0 to D31) as well as sixteen 128-bit registers (Q0 to Q15). In fact, $D_{2 \times i}$ and $D_{2 \times i + 1}$ are mapped to the same physical location of the register $Q_i$ and some operations like multiplication on the 64-bit D registers can return result in the 128-bit Q register \cite{hua_idisa}. NEON supports the field width of 8 bits, 16 bits, 32 bits and 64 bits integer operations as well as 32-bit floating point operations.
@@ -52,7 +52,7 @@ After the transposition, the character class bit streams would be generated usin
 Some useful Pablo primitives are listed as the following \cite{rob_xml_2011}:
 \begin{enumerate}
     \item Bitwise logic: AND, OR, XOR and NOT on arbitrary length bit stream.
-    \item Advance: shift right the whole bit stream for 1 bit.
+    \item Advance: shift forward the whole bit stream for 1 bit. In a little ending system, shift forward is to shift left because the bytes that comes first in the input stream resides in the lower memory address.
     \item ScanThru: $s(M, C)$ denotes the operation of scanning from the marker stream $M$ as the initial positions through the spans of ones in the stream $C$. Figure~\ref{figure:scanthru} shows an example of it.
       \[ s(M, C) = (M + C) \land \lnot C \]
       One example of ScanThru is in XML well-formedness checking, to check if a {\tt <tag>} is written in correct syntax, $M$ would mark all the start positions of tags e.g.\ the next position after the opening angle bracket ({\tt <}) and $C$ is the marker stream for all legal tag content. $s(M, C)$ should mark all the positions of the closing angle bracket ({\tt >}) which close tags. Say $M_0$ denotes the character class of {\tt >}, then if $s(M, C) \land \lnot M_0$ is not all zero, some tag is not closed properly with the {\tt >} symbol. Note that all the tags in the stream are checked at once in parallel in the unbounded bit streams model.
@@ -106,7 +106,7 @@ The IDISA library divides SIMD operations in the following categories \cite{idis
 \begin{itemize}
     \item Vertical Operations (Template Class {\tt simd<w>}): Most common SIMD operations between two registers. E.g.\ {\tt simd<8>::add(A, B)} aligns registers A and B vertically and adds up the aligned 8-bit fields. Different fields are independent of each other.
     \item Horizontal Operations (Template Class {\tt hsimd<w>}): Operations like packing align the two operands horizontally, extract a portion of the bits data and concatenate into one full SIMD register.
-    \item Expansion Operations (Template Class {\tt esimd<w>}): Operations that double the width of fields like merging high bits which would take the higher 64 bits of the two operands(A and B), concatenate the first field from A and the first field from B and get a new field with the width doubled.
+    \item Expansion Operations (Template Class {\tt esimd<w>}): Operations that double the width of fields like merging high bits which would take the higher 64 bits of the two operands (A and B), concatenate the first field from A and the first field from B and get a new field with the width doubled. Do the same to the following fields until an full SIMD register C is generated.
     \item Field Movement Operations (Template Class {\tt mvmd<w>}): Operations that copy and move the entire fields. The content of these fields would not change.
 \end{itemize}
 
@@ -115,21 +115,22 @@ The IDISA library claims to have better performance compared to the hand-written
 \subsection{Critical Parabix Operations}
 There are at least three critical Parabix operations that can be the performance bottleneck and need special attention:
 \begin{itemize}
-    \item Transposition. The first step of every Parabix application and can be the primary overhead of the Parabix technology. There are two major algorithms, the ideal three-stage implementation and the byte-pack implementation. The byte-pack implementation utilize packing on 16 bit field width which is widely available on commodity processors while the ideal three-stage implementation was proved optimal in the IDISA model. Details of these two algorithms can be found in \cite{inductive_doubling_principle}.
-    \item Inverse transposition. For some applications like the UTF-8 to UTF-16 transcoding, parallel bit streams needs to be modified and translated back into byte streams, thus an inverse transposition is needed. A detailed discussion can be found in \cite{rob_u8u16}.
-    \item Long stream addition. Pablo compiler deal with addition between unbounded bit streams using chained long stream additions, which adds two numbers as wide as the SIMD register with a carry-in bit and generates a carry-out bit. The naive approach would be chaining 64-bit additions together to emulate 128-bit, 256-bit or 512-bit additions. The time complexity grows linearly with the SIMD register size and a better algorithm is proposed in \cite{rob_regex} which could adds up to 4096 bits wide integers in constant time. We would discuss this algorithm further in Chapter~\ref{four}.
+    \item Transposition. The first step of every Parabix application and can be the primary overhead of the Parabix technology. There are two major algorithms, the ideal three-stage implementation and the byte-pack implementation. The byte-pack implementation utilize packing on 16 bit field width which is widely available on commodity processors while the ideal three-stage implementation was proved optimal in instructions count in the IDISA model. Details of these two algorithms can be found in \cite{inductive_doubling_principle}.
+    \item Inverse transposition. For some applications like the UTF-8 to UTF-16 transcoding, parallel bit streams needs to be modified and translated back into byte streams, thus an inverse transposition is needed. As the inverse operation to the transposition, there are also two algorithms available which mirror the transposition algorithms. A detailed discussion can be found in \cite{rob_u8u16}.
+    \item Long stream addition. Pablo compiler deal with addition between unbounded bit streams using chained long stream additions, which adds two numbers as wide as the SIMD register with a carry-in bit and generates a carry-out bit. The naive approach would be chaining 64-bit additions together to emulate 128-bit, 256-bit or 512-bit additions. The time complexity of the naive approach grows linearly with the SIMD register size and a better algorithm is proposed in \cite{rob_regex} which could adds up to 4096 bits wide integers in constant time. We would discuss this algorithm further in Chapter~\ref{four}.
 \end{itemize}
 
 Since they are performance critical, these operations would be used as the application level benchmarks in the evaluate section.
 
 \section{LLVM Basics}
-Introduce LLVM and IR.
+The \textit{Low Level Virtual Machine (LLVM)} is an open-source, well developed compiler tool that is dedicated to the compiler writers. It is proposed in 2000 with Lattner's Master thesis \cite{chris_msthesis} and is gaining popularity ever after. Today it is developed into a high-performance static compiler backend with just-in-time compilers and life-long program analysis and optimizations, which means program analysis and optimizations in compile time, link time and run time \cite{llvm_ghc, llvm_cgo04}. It supports a variety of targets from Intel X86, PowerPC to the ARM mobile platform and hides the low-level target-specific issues for the compiler writers. LLVM is now sponsored by companies like Google and Apple and it is likely to become the default backend choice that last a long time in the this field.
+
+LLVM uses the intermediate representation (IR) as its virtual instruction set and IR is used as not only the input code to the LLVM tool chain but also the internal representation for analysis and optimization passes. This enables the programmer to use LLVM as a pipeline and inspect output from each step. Although IR is low-level, it preserves high-level static informations through the strong type system and its static single assignment (SSA) form. According to \cite{cytron1991efficiently}, SSA form guarantees only one assignment to every variable and would help calculate the high-level dataflow. The main design goal of IR is to be low-level enough so that most programming language can target to it while maintaining the most high-level information to make aggressive backend optimizations possible \cite{llvm_ghc}.
+
+LLVM IR is target-independent and it provides powerful operations like shufflevector that can express most of the complex Parabix operations. The IR code are processed through the target-independent code generator and the machine code (MC) layer to become the native machine code. We will describe the code generation process in detail in the next section as it is the major piece of logic we extend for parallel bit streams.
 
 \section{LLVM Target-Independent Code Generator}
-Introduce a little bit.
-Need to talk about selectionDAG
-
-LLVM as a modularized compiler tool chain, allows us to implement our optimization conveniently. As we discussed before, LLVM has a general code generation algorithm, the first stage is instruction selection, listed below\cite{llvm_code_gen}:
+The first stage for code generation is Instruction Selection, which translates LLVM code into the target-specific machine instructions. After that, there are machine level optimizations like live intervals analysis and register allocation. We focus on Instruction Selection and it is done by the following steps \cite{llvm_code_gen} (we would describe each step in the following text):
 
 \begin{itemize}
   \item Initial SelectionDAG Construction: generate SelectionDAG from LLVM IR.
@@ -142,16 +143,18 @@ LLVM as a modularized compiler tool chain, allows us to implement our optimizati
   \item Scheduling and Formation Phase
 \end{itemize}
 
-We can see there are DAG combine passes after the initial construction and each legalize phase\cite{llvm_code_gen}. DAG combine passes optimize selectionDAG with both general and machine-dependent strategies, making the work easier for initial constructor and legalizers: they can focus on generating accurate selectionDAG, good and legal operations with no worries of messy output.
+LLVM internally constructs a graph view of the input code called SelectionDAG where DAG is short for directed acyclic graph. Each node in the DAG represents an operation with an opcode, a number of operands and a number of return values. If a DAG node A uses the return value of the other DAG node B, an edge will be there from B to A. The SelectionDAG enables a large variety of very-low-level optimizations and also benefits the instruction scheduling process by recording the instruction dependency in the graph.
 
-The other advantage of DAG combiner is, you can choose the combine timing on your own. If you choose to combine before Legalize Types Phase, you can freely introduce illegal types into your combined results. This is different from legalizing phases. Generally speaking, you cannot introduce illegal types in Legalize Type Phase and cannot introduce illegal operations in Legalize Phase. This puts a limitation on machine-independent legalize strategies: $i8$ is the minimum integer type on X86 arch, programmer needs to extend every integer less than 8 bits to $i8$ before returning it to the DAG.
+There are DAG combine passes after the initial construction and each legalize phase\cite{llvm_code_gen}. We will explain "legality" in the next section. DAG combine passes clean up SelectionDAG with both general and machine-dependent strategies, making the work easier for initial constructor and legalizers: they can focus on generating accurate SelectionDAG, good and legal operations with no worries of the messy output.
 
-For each target, LLVM has a specific target lowering class, e.g.\ X86ISelLowering for X86 arch. We put our code generation logic here as a DAG combiner. For each shufflevector node, we check if the mask matches certain pattern, say consecutive odd numbers from 1 to 31, then we combine the node into a tree of operations, say X86ISD::PACKUS and logic/shifting.
+Instruction Select Phase is the bulk of target-specific logic that translates a legal SelectionDAG into a new DAG of target code with pattern matching facility. For example, a node of floating point addition followed by a floating point multiplication could be merged into one FMADDS node on the target that supports floating point multiply-and-add (FMA) operations \cite{llvm_code_gen}.
 
-\subsection{Vector and Legalization}
-SIMD operations exploit data parallelism by performing the same operation on different data at the same time. Those data are grouped together as vectors. LLVM uses the notion \verb|<N x iX>| to represent a vector of N elements, where each of the element is an integer of X bits \cite{llvm_lang_ref, hybrid_simd_type_legalize}. \verb|<N x iX>| is also denoted as $vNiX$ as $vNiX$ is the internal type name used in the LLVM source code; e.g.\ \verb|<4 x i32>| is the same with $v4i32$.
+The Scheduling and Formation Phase would assign an order to each target instruction following the target's constraints. After that, a list of MachineInstrs will be generated and the SelectionDAG is no longer needed.
 
-In LLVM IR, programmer can write any kind of vectors, even $v1024i3$, and those vectors may not be supported by the target machine. LLVM has the notion of a "legal" vs. "illegal". A type is legal for a target only if it is supported by some operation. In selectionDAG, a DAG node is legal only if the target supports the operation and operands type. For example, $v16i8$ is legal on X86 SSE2 architecture, since the architecture supports ADD on 2 $v16i8$ vectors; but it does not support multiplication on 2 $v16i8$ vectors, so that the DAG node MUL on $v16i8$ is illegal. LLVM has Legalize Types and Legalize Operations Phases to turn illegal type or DAG into legal\cite{llvm_code_gen}.
+\subsection{Vector Type and Legality}
+SIMD data are grouped into vectors and LLVM uses the notion \verb|<N x iX>| to represent a vector of N elements, where each of the element is an integer of X bits \cite{llvm_lang_ref, hybrid_simd_type_legalize}. \verb|<N x iX>| is also denoted as $vNiX$ as $vNiX$ is the internal type name used in the LLVM source code; e.g.\ \verb|<4 x i32>| is the same with $v4i32$.
+
+In LLVM IR, programmer can write any kind of vectors, even $v1024i3$, and those vectors may not be supported by the target machine. LLVM has the notion of a "legal" vs. "illegal". A type is legal for a target only if it is supported by some operation. In SelectionDAG, a DAG node is legal only if the target supports the operation and operands type. For example, $v16i8$ is legal on X86 SSE2 architecture, since the architecture supports ADD on 2 $v16i8$ vectors; but it does not support multiplication on 2 $v16i8$ vectors, so that the DAG node MUL on $v16i8$ is illegal. LLVM has Legalize Types and Legalize Operations Phases to turn illegal type or DAG into legal\cite{llvm_code_gen}.
 
 Legalize type phase has three ways to legalize vector types\cite{hybrid_simd_type_legalize}: \textit{Scalarization}, \textit{Vector Widening} and \textit{Vector Element Promotion}.
 
@@ -161,12 +164,12 @@ Legalize type phase has three ways to legalize vector types\cite{hybrid_simd_typ
     \item \textbf{Vector Element Promotion} preserves the number of elements, but promote the element type to a wider size, e.g.\ $v4i8$ to $v4i32$.
 \end{itemize}
 
-After type legalization, we may still have illegal DAG node, such as multiplication on $v16i8$ for X86 SSE2 architecture; thus we need legalize operations phase. There are three strategies in this phase:
+After the type legalization, we may still have illegal DAG node, such as multiplication on $v16i8$ for X86 SSE2 architecture; thus we need legalize operations phase. There are three strategies in this phase:
 
 \begin{itemize}
-    \item \textbf{Expansion}: Use another sequence of operations to emulate the operation. Expansion strategy is often general.
-    \item \textbf{Promotion}: Promote the operand type to a larger type that support the operation.
+    \item \textbf{Expansion}: Use another sequence of operations to emulate the operation. Expansion strategy is often general in the sense that it may use slow operations such as memory load and store, but it would generate native code with correct outcome.
+    \item \textbf{Promotion}: Promote the operand type to a larger type that the operation supports.
     \item \textbf{Custom}: Write a target-specific code to implement the legalization. Similar to Expansion, but with a specific target in mind.
 \end{itemize}
 
-When talk about Parabix background, talk about IDISA and "bitcast".
+No illegal type should be introduced in the operation legalization which puts a limitation on the machine-independent legalize strategies: $i8$ is the minimum integer type on X86 and programmer needs to extend every integer less than 8 bits to $i8$ before returning it to the DAG\@. On the other hand DAG combine is different, you can choose the combine timing on your own. If you choose to combine before Legalize Types Phase, you can freely introduce illegal types into your combined results.
