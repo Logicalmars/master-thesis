@@ -17,5 +17,22 @@
 
 \prefacesection{Abstract}
 
-Parallel bit streams (Parabix) is a promising text processing method that are recently applied to the UTF-8 to UTF-16 transcoding, XML parsing and regular expression matching. With a portable high-performance SIMD library, it achieves good performance improvement in all these applications. However, this SIMD library is not perfect: with a uniform API, it still has to maintain different implementation for different architectures which requires a deep understanding of its instructions set. Furthermore, this library is generated based on the least number of instructions within a single function that is not the best criteria since the context information are not considered. To address these two issues, a better backend is necessary and LLVM is a good candidate. With its target-independent intermediate representation (IR), a portable SIMD library can be easily written and compiled with life-long program analysis and optimization. In this thesis, we replace the Parabix backend with the IR library and systematically extend LLVM to have better code generation. We first redefine the type legality in LLVM and implement a few algorithms to lower vectors with small elements; we then insert logic in the LLVM backend to recognize and properly handle Parabix critical operations such as packing, merging and long stream addition. Our experiment on the X86 architecture demonstrates the performance as good as the well-tuned IDISA library and about 300 times faster than the LLVM native backend for some micro benchmark. We also demonstrate a better performance gained by switching from X86 SSE2 to AVX2 without any change in the source code.
-
+Parabix (parallel bit stream) technology uses the SIMD (single-instruction
+multiple-data) capabilities of commodity processors for high-performance
+text processing in applications such as Unicode transcoding, XML parsing
+and regular expression matching.   LLVM is a widely-used compiler-infrastructure
+with a target-independent intermediate representation (IR) that includes
+notational support for SIMD operations on vectors of small integers.
+This thesis investigates whether it is possible to modify LLVM to
+incorporate all the SIMD processing requirements of Parabix both to
+increase the portability of applications and to create
+additional opportunities for optimization of those operations in the
+context of code generation.   Our modifications to LLVM include
+redefining type legality and lowering for vectors of small elements
+as well as insertion of logic to recognize and properly handle Parabix-critical
+operations such as packing, merging and long stream addition.
+Experiments on the X86/SSE2 architecture show a speedup over the unmodified
+LLVM of about 300 times for some micro-benchmarks and demonstrate
+Parabix application performance slightly better than with its original
+SSE2 libraries. We also demonstrate performance scaling in switching
+from X86/SSE2 to X86/AVX2 without any change in source code.
