@@ -7,10 +7,10 @@
 \chapter{Performance Evaluation}
 \label{six}
 
-In this chapter, we focus on the performance evaluation to show that our LLVM backend could not only match performance with the hand-written library, but also provide a better chance to optimize according to the specific target. We would first validate our vector of $i2^k$ approaches, and then present the performance of some critical Parabix operations via application-level profile.
+In this chapter, we focus on the performance evaluation to show that our LLVM back end could not only match performance with the hand-written library, but also provide a better chance to optimize according to the specific target. We would first validate our vector of $i2^k$ approaches, and then present the performance of some critical Parabix operations via application-level profile.
 
 \section{Vector of $i2^k$ Performance}
-In Chapter~\ref{four}, we present different approaches to lower $i1$, $i2$, $i4$ and some $i8$ operations within one SIMD register. In this section, we would validate our approaches by showing the improved runtime performance.
+In Chapter~\ref{four}, we present different approaches to lower $i1$, $i2$, $i4$ and some $i8$ operations within one SIMD register. In this section, we would validate our approaches by showing the improved run-time performance.
 
 \subsection{Methodology}
 
@@ -21,13 +21,13 @@ We did one simple experiment with SIMD XOR ($xorps$) to validate this program. R
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=140mm]{draw/testp_xor.png}
-\caption[Test Performance with XOR]{Test performance with XOR\@.}
+\caption[Test Performance with XOR]{Test performance with XOR\@. The dotted line is instruction count and the other line is core CPU cycles.}
 \label{figure:testp_xor}
 \end{figure}
 
-From the figure, we can see the instructions count and CPU cycles grows linearly with the number of XOR instructions. So we can conclude that Dr. Fog's test program can be used to compare two pieces of critical code: the one with more measured CPU cycles is more complex and have more instructions. Note that from the figure, it seems the throughput of $xorps$ is 4, which is different from Intel's document (3 in document). We found this may be related to the compiler optimization on the loop; when we flattened the loop we got the throughput around 2 to 3. In order to eliminate this undesired effect, we would flatten the test code in the following sections.
+From the figure, we can see the instruction count and CPU cycles grows linearly with the number of XOR instructions. So we can conclude that Dr. Fog's test program can be used to compare two pieces of critical code: the one with more measured CPU cycles is more complex and have more instructions. Note that from the figure, it seems the throughput of $xorps$ is 4, which is different from Intel's document (3 in document). We found this may be related to the compiler optimization on the loop; when we flattened the loop we got the throughput around 2 to 3. In order to eliminate this undesired effect, we would flatten the test code in the following sections.
 
-In the following sections, we would write micro benchmarks with Agner Fog's test program and compare reciprocal throughput between different implementation. Our test machine is X86 64-bit Ubuntu with Intel Haswell, and the detailed configuration can be found in Table~\ref{table:hardware_config}. In order to inline pure IR functions (instead of a function call into one object file), we compile all the test code into LLVM bitcode (binary form of LLVM IR) and then link / optimize them together. The default compile flag is to use Intel SSE2 instruction set and 64 bit.
+In the following sections, we would write micro benchmarks with Agner Fog's test program and compare reciprocal throughput between different implementation. Our test machine is X86 64-bit Ubuntu with Intel Haswell, and the detailed configuration can be found in Table~\ref{table:hardware_config}. In order to inline pure IR functions (instead of a function call into one object file), we compile all the test code into LLVM bit code (binary form of LLVM IR) and then link / optimize them together. The default compile flag is to use Intel SSE2 instruction set and on 64-bit OS.
 
 \begin{table}[h]
 \centering
@@ -66,7 +66,7 @@ The underlying logic for both libraries is the same, but it is implemented in di
 
 However, the delay in expansion is not always good. Take multiplication on the $i2$ vector for an example, we can see our IR library has slightly better total CPU cycles, but if we write our instructions sequence with a loop, IDISA library would win (Figure~\ref{figure:loop_vector_i2}). Loop optimization should be responsible for this difference and we did observe some kind of hoisting in the assembly code. Early expansion in IDISA also provides more optimization opportunity to the compiler front end.
 
-Further more, from the reciprocal throughput comparison (Figure~\ref{figure:throughput_vector}), IR libary loses a bit on $i1$ vectors but wins most of the cases in $i2$ and $i4$; it may relate to a better instruction selection. IDISA library is generated from a strategy pool based on the number of basic instructions which are treated equally as cost 1. But basic instructions actually have different throughput in the real hardware, and LLVM backend are aware of that, thus selecting better instructions.
+Further more, from the reciprocal throughput comparison (Figure~\ref{figure:throughput_vector}), IR library loses a bit on $i1$ vectors but wins most of the cases in $i2$ and $i4$; it may relate to a better instruction selection. IDISA library is generated from a strategy pool based on the number of basic instructions which are treated equally with cost 1. But basic instructions actually have different throughput in the real hardware, and LLVM back end are aware of that, thus selecting better instructions.
 
 \begin{figure}[ht!]
 \centering
@@ -111,7 +111,7 @@ ugt  & 290  & X    & X    & 1\\ \hline
 \end{table}
 
 \section{Parabix Critical Operations}
-In this section, we evaluate our work by replacing Parabix critical operations with the IR library. We first choose transposition and inverse transposition as two representative operations and measure performance in two Parabix applications: XML validator and UTF-8 to UTF-16 transcoder. Note that we did not rewrite the whole application with an IR library, part of the application is still IDISA but some critical operation is replaced. The default compile flag is to use Intel SSE2 instruction set and 64 bit.
+In this section, we evaluate our work by replacing Parabix critical operations with the IR library. We first choose transposition and inverse transposition as two representative operations and measure performance in two Parabix applications: XML validator and UTF-8 to UTF-16 transcoder. Note that we did not rewrite the whole application with an IR library, part of the application is still IDISA but some critical operation is replaced. The default compile flag is to use Intel SSE2 instruction set and on 64-bit OS.
 
 \begin{table}[h]
 \centering
@@ -124,7 +124,7 @@ xmlwf0 on Haswell   &  3.929   &   4.363   &   4.554   &   4.876   &   5.178 \\ 
 xmlwf1   &  3.929   &   4.371   &   4.566   &   4.861   &   5.186 \\ \hline
 xmlwf1 on Haswell &   3.566   &   3.978   &   4.163   &   4.451   &   4.787 \\ \hline
 \end{tabular}
-\caption[Performance comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf), in thousand CPU cycles per thousand byte. In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is a copy of xmlwf0 with the transposition replaced.}
+\caption[Performance comparison of XML Validator (xmlwf)]{Performance comparison of XML validator (xmlwf), in a thousand CPU cycles per thousand byte. In the table, xmlwf0 is implemented with full IDISA library and xmlwf1 is a copy of xmlwf0 with the transposition replaced.}
 \label{table:xmlwf_perf}
 \end{table}
 
@@ -138,13 +138,13 @@ xmlwf1 on Haswell &   3.566   &   3.978   &   4.163   &   4.451   &   4.787 \\ \
  U8u16\_1         & 284.17  & 36.71   & 41.65       & 255.57 & 10.6     \\ \hline
  U8u16\_1 Haswell & 267.14  & 34.64   & 38.53       & 237.66 & 9.98     \\ \hline
  \end{tabular}
- \caption[Performance comparison of UTF-8 UTF-16 Transcoder]{Performance comparison of UTF-8 UTF-16 transcoder, in million CPU cycles. U8u16\_0 is written in IDISA, U8u16\_1 has the transposition and inverse transposition part replaced.}
+ \caption[Performance comparison of UTF-8 UTF-16 Transcoder]{Performance comparison of UTF-8 UTF-16 transcoder, in a million CPU cycles. U8u16\_0 is written in IDISA, U8u16\_1 has the transposition and inverse transposition part replaced.}
  \label{table:u8u16_perf}
  \end{table}
 
 Table~\ref{table:xmlwf_perf} shows the performance of the XML Validator. The only difference of xmlwf0 and xmlwf1 is their transposition code, and the one in xmlwf1 is written in pure IR with the byte-pack algorithm. We can see xmlwf0 and xmlwf1 share almost identical performance and it is not for free. LLVM 3.4 cannot handle packing on 16-bit field width very well and we custom lower the shufflevector and generate PACKUS instruction for X86.
 
-Another interesting observation is, when we re-compiled the same code on the Intel Haswell platform, we got almost no improvement for xmlwf0, since the IDISA library linked in is written with SSE2 intrinsics and only SSE2 instructions can be generated; but we got a slightly better performance for xmlwf1, because the IR library is target-independent and LLVM backend knows other instruction sets like SSE3, SSE4 is available on this platform, it generates better code with them.
+Another interesting observation is, when we re-compiled the same code on the Intel Haswell platform, we got almost no improvement for xmlwf0, since the IDISA library linked in is written with SSE2 intrinsic and only SSE2 instructions can be generated; but we got a slightly better performance for xmlwf1, because the IR library is target-independent and LLVM back end knows other instruction sets like SSE3, SSE4 is available on this platform, it generates better code with them.
 
 Similar performance data on UTF-8 to UTF-16 transcoder is listed in Table~\ref{table:u8u16_perf}. U8u16\_0 is written in IDISA and U8u16\_1 has both the transposition and inverse transposition part replaced. We also tried to compile them on the full Haswell, which gave us similar performance benefit.
 
@@ -167,7 +167,7 @@ xmlwf2 on Haswell & 4.11   &    4.49   &    4.69   &    4.978   &   5.308 \\ \hl
 \subsection{Long Stream Addition}
 We replaced the internal logic of big integer addition in Chapter~\ref{four} and introduced a new intrinsic: {\tt uadd.with.overflow.carryin}. We would evaluate them in this section by first comparing the long-stream addition algorithm with LLVM's original implementation and then doing some application level profile for the new intrinsic.
 
-We wrote micro benchmark with Dr. Fog's test program and we put 200 independent additions on $i128$ and $i256$. It was tricky to make the test program right, we generated random data for the operands and we carefully inserted the carry-out bit back to the return value so that our long stream addition logic would not be optimized away. In order to be consistent throughout the comparison, we used the same compiler flag for all the runs ({\tt -mavx2} for gcc and {\tt -mattr=+avx2,+bmi2} for LLVM tool chain). The result is listed in Table~\ref{table:lsadd_micro}.
+We wrote micro benchmarks with Dr. Fog's test program and we put 200 independent additions on $i128$ and $i256$. It was tricky to make the test program right, we generated random data for the operands and we carefully inserted the carry-out bit back to the return value so that our long stream addition logic would not be optimized away. In order to be consistent throughout the comparison, we used the same compiler flag for all the runs ({\tt -mavx2} for gcc and {\tt -mattr=+avx2,+bmi2} for LLVM tool chain). The result is listed in Table~\ref{table:lsadd_micro}.
 
 \begin{table}[h]
 \centering
@@ -179,13 +179,13 @@ LLVM on $i128$                 & 1455            & 4199         \\ \hline
 Long stream addition on $i256$ & 4103            & 10152        \\ \hline
 LLVM on $i256$                 & 4234            & 9798         \\ \hline
 \end{tabular}
-\caption{Micro benchmark for long stream addition against LLVM's original implementation.}
+\caption{Micro benchmarks for long stream addition against LLVM's original implementation.}
 \label{table:lsadd_micro}
 \end{table}
 
 Long stream addition does not perform well on $i128$, since there is only two sequential additions involved (1 $addq$ and 1 $adcq$) and parallel computing would not save much but introduce complexity. However, we can see on $i256$ long stream addition has almost identical performance with the sequential implementation, which generates 1 $addq$ and 3 $adcq$. As the width of the operand doubles, the CPU cycles from LLVM increases to the rate of 2.91, while in the long stream addition, the rate is only 1.35, under 2; thus we could confidently predict that on the Intel AVX512, long stream addition on $i512$ would perform better than the sequential addition.
 
-We then show application level profile of `icgrep' which is an tool for regular expression matching with bitwise data parallelism. We replaced the internal "add with carry" logic with one single intrinsic and plotted the performance in Figure~\ref{figure:lsadd_icgrep}. We can see the performance drops because that version of icgrep works with 128-bit SIMD registers and long stream addition does not work well on $i128$. We could expect better performance on wider SIMD registers.
+We then show application level profile of `icgrep' which is a tool for regular expression matching with bitwise data parallelism. The internal "add with carry" logic is replaced with one single intrinsic and the performance is plotted in Figure~\ref{figure:lsadd_icgrep}. The performance drops because that version of icgrep works with 128-bit SIMD registers and long stream addition does not work well on $i128$. We could expect better performance on wider SIMD registers.
 
 \begin{figure}[ht!]
 \centering

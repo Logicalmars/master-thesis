@@ -15,7 +15,7 @@ The other important feature of the SWAR model is that the partition is not physi
 However, since the SWAR instruction sets for different platforms are developed independently and operations available are determined mostly by the application requirements, different platform has different SWAR implementation, and the available instructions set are often sparse in the sense that not every power-of-two field width are supported \cite{hybrid_simd_type_legalize}.
 
 \subsection{Commercial SIMD Instructions Sets}
-Some of the popular SIMD instructions sets are listed here:
+Some popular SIMD instructions sets are listed here:
 \begin{itemize}
   \item Intel MultiMedia eXtension (MMX). It defines eight 64-bit registers known as MM0 to MM7 which are aliases of the existing IA-32 Floating-Point Unit (FPU) stack registers. MMX only provides integer operations for early graphical applications thus is not a general purpose instruction set for SIMD programming \cite{hua_idisa}.
   \item Intel Streaming SIMD Extensions (SSE) series. SSE extends the MMX instructions set and introduces eight new independent 128-bit SIMD registers known as XMM0 to XMM7. Its successor SSE2 adds a rich set of integer instructions to the 128-bit XMM registers which makes it a useful SIMD programming model. AMD added support for SSE2 in its AMD64 architecture soon after the Intel released SSE2 thus in effect making SSE2 broadly available across the desktop computers. We would use SSE2 as our main instructions set target for 128-bit registers. Intel then released SSE3, SSSE3, SSE4 and AMD released SSE4a as the following SSE generations.
@@ -100,37 +100,51 @@ To actually execute the C++ code, a set of runtime library is necessary. Dr. Cam
     \item Merging operations that produce one vector of field width $W$ with two vectors of field width $W/2$.
 \end{itemize}
 
-A C++ library is then developed after this model and it is called the IDISA library. To be clear, in the following sessions the abstract architecture will be called the IDISA model to distinguish from the IDISA library. An interesting fact about the IDISA library is that it is actually generated automatically from a pool of strategies to avoid duplicated human work among different targets. When targeting at a new platform, a set of machine intrinsics will be mapped to proper instructions in the IDISA model. This would be sparse that many other operations needed by the model are still not available. The IDISA library generator could fill the gaps with a pool of strategies which basically tells how to implement instruction C given instruction A and B are available. Multiple strategies for the same instruction may exist and the generator would choose based on least instruction count mechanism \cite{hua_idisa}.
+A C++ library is then developed after this model and it is called the IDISA library. To be clear, in the following sessions the abstract architecture will be called the IDISA model to distinguish from the IDISA library. An interesting fact about the IDISA library is that it is actually generated automatically from a pool of strategies to avoid duplicated human work among different targets. When targeting at a new platform, a set of machine intrinsic will be mapped to proper instructions in the IDISA model. This would be sparse that many other operations needed by the model are still not available. The IDISA library generator could fill the gaps with a pool of strategies which basically tells how to implement instruction C given instruction A and B are available. Multiple strategies for the same instruction may exist and the generator would choose based on least instruction count mechanism \cite{hua_idisa}.
+
+\begin{figure}[ht!]
+\centering
+\includegraphics[width=130mm]{draw/horizontal.png}
+\caption[Horizontal Operations in IDISA]{The logic of IDISA Horizontal Operations, cited from \cite{hua_idisa}.}
+\label{figure:horizontal}
+\end{figure}
+
+\begin{figure}[ht!]
+\centering
+\includegraphics[width=130mm]{draw/expansion.png}
+\caption[Expansion Operations in IDISA]{The logic of IDISA Expansion Operations, cited from \cite{hua_idisa}.}
+\label{figure:expansion}
+\end{figure}
 
 The IDISA library divides SIMD operations in the following categories \cite{idisa_webpage}:
 \begin{itemize}
-    \item Vertical Operations (Template Class {\tt simd<w>}): Most common SIMD operations between two registers. E.g.\ {\tt simd<8>::add(A, B)} aligns registers A and B vertically and adds up the aligned 8-bit fields. Different fields are independent of each other.
-    \item Horizontal Operations (Template Class {\tt hsimd<w>}): Operations like packing align the two operands horizontally, extract a portion of the bits data and concatenate into one full SIMD register.
-    \item Expansion Operations (Template Class {\tt esimd<w>}): Operations that double the width of fields like merging high bits which would take the higher 64 bits of the two operands (A and B), concatenate the first field from A and the first field from B and get a new field with the width doubled. Do the same to the following fields until an full SIMD register C is generated.
+    \item Vertical Operations (Template Class {\tt simd<w>}): Most common SIMD operations between two registers and {\tt w} is the field width. E.g.\ {\tt simd<8>::add(A, B)} aligns registers A and B vertically and adds up the aligned 8-bit fields. Different fields are independent of each other.
+    \item Horizontal Operations (Template Class {\tt hsimd<w>}): Operations like packing align the two operands horizontally, extract a portion of the bits in operands and concatenate into one full SIMD register. (Figure~\ref{figure:horizontal})
+    \item Expansion Operations (Template Class {\tt esimd<w>}): Operations that double the width of fields like merging which would take the higher 64 bits of the two operands (A and B), concatenate the first field from A and the first field from B and get a new field with the width doubled. Do the same to the following fields until a full SIMD register C is generated. (Figure~\ref{figure:expansion})
     \item Field Movement Operations (Template Class {\tt mvmd<w>}): Operations that copy and move the entire fields. The content of these fields would not change.
 \end{itemize}
 
-The IDISA library claims to have better performance compared to the hand-written libraries and it is the main competitor of our LLVM backend.
+The IDISA library claims to have better performance compared to the hand-written libraries and it is the main competitor of our LLVM back end.
 
 \subsection{Critical Parabix Operations}
 There are at least three critical Parabix operations that can be the performance bottleneck and need special attention:
 \begin{itemize}
-    \item Transposition. The first step of every Parabix application and can be the primary overhead of the Parabix technology. There are two major algorithms, the ideal three-stage implementation and the byte-pack implementation. The byte-pack implementation utilize packing on 16 bit field width which is widely available on commodity processors while the ideal three-stage implementation was proved optimal in instructions count in the IDISA model. Details of these two algorithms can be found in \cite{inductive_doubling_principle}.
+    \item Transposition. The first step of every Parabix application and can be the primary overhead of some Parabix application. There are two major algorithms: the ideal three-stage implementation and the byte-pack implementation. The byte-pack implementation utilize packing on 16 bit field width which is widely available on commodity processors while the ideal three-stage implementation was proved optimal in instruction count in the IDISA model. Details of these two algorithms can be found in \cite{inductive_doubling_principle}.
     \item Inverse transposition. For some applications like the UTF-8 to UTF-16 transcoding, parallel bit streams needs to be modified and translated back into byte streams, thus an inverse transposition is needed. As the inverse operation to the transposition, there are also two algorithms available which mirror the transposition algorithms. A detailed discussion can be found in \cite{rob_u8u16}.
     \item Long stream addition. Pablo compiler deal with addition between unbounded bit streams using chained long stream additions, which adds two numbers as wide as the SIMD register with a carry-in bit and generates a carry-out bit. The naive approach would be chaining 64-bit additions together to emulate 128-bit, 256-bit or 512-bit additions. The time complexity of the naive approach grows linearly with the SIMD register size and a better algorithm is proposed in \cite{rob_regex} which could adds up to 4096 bits wide integers in constant time. We would discuss this algorithm further in Chapter~\ref{four}.
 \end{itemize}
 
-Since they are performance critical, these operations would be used as the application level benchmarks in the evaluate section.
+Since they are performance critical, these operations would be used as the application level benchmarks in the evaluation section.
 
 \section{LLVM Basics}
-The \textit{Low Level Virtual Machine (LLVM)} is an open-source, well developed compiler tool that is dedicated to the compiler writers. It is proposed in 2000 with Lattner's Master thesis \cite{chris_msthesis} and is gaining popularity ever after. Today it is developed into a high-performance static compiler backend with just-in-time compilers and life-long program analysis and optimizations, which means program analysis and optimizations in compile time, link time and run time \cite{llvm_ghc, llvm_cgo04}. It supports a variety of targets from Intel X86, PowerPC to the ARM mobile platform and hides the low-level target-specific issues for the compiler writers. LLVM is now sponsored by companies like Google and Apple and it is likely to become the default backend choice that last a long time in the this field.
+The \textit{Low Level Virtual Machine (LLVM)} is an open-source, well developed compiler tool that is dedicated to the compiler writers. It is proposed in 2000 with Lattner's Master thesis \cite{chris_msthesis} and is gaining popularity ever after. Today it is developed into a high-performance static compiler back end with just-in-time compilers and life-long program analysis and optimization, which means program analysis and optimization in compile time, link time and run time \cite{llvm_ghc, llvm_cgo04}. It supports a variety of targets from Intel X86, PowerPC to the ARM mobile platform and hides the low-level target-specific issues for the compiler writers. LLVM is now sponsored by companies like Google and Apple and it is likely to become the default back end choice that last a long time in this field.
 
-LLVM uses the intermediate representation (IR) as its virtual instruction set and IR is used as not only the input code to the LLVM tool chain but also the internal representation for analysis and optimization passes. This enables the programmer to use LLVM as a pipeline and inspect output from each step. Although IR is low-level, it preserves high-level static informations through the strong type system and its static single assignment (SSA) form. According to \cite{cytron1991efficiently}, SSA form guarantees only one assignment to every variable and would help calculate the high-level dataflow. The main design goal of IR is to be low-level enough so that most programming language can target to it while maintaining the most high-level information to make aggressive backend optimizations possible \cite{llvm_ghc}.
+LLVM uses the intermediate representation (IR) as its virtual instruction set and IR is used as not only the input code to the LLVM tool chain but also the internal representation for analysis and optimization passes. This enables the programmer to use LLVM as a pipeline and inspect output from each step. Although IR is low-level, it preserves high-level static information through the strong type system and its static single assignment (SSA) form. According to \cite{cytron1991efficiently}, SSA form guarantees only one assignment to every variable and would help calculate the high-level data flow. The main design goal of IR is to be low-level enough so that most programming language can target to it while maintaining the most high-level information to make aggressive back end optimization possible \cite{llvm_ghc}.
 
 LLVM IR is target-independent and it provides powerful operations like shufflevector that can express most of the complex Parabix operations. The IR code are processed through the target-independent code generator and the machine code (MC) layer to become the native machine code. We will describe the code generation process in detail in the next section as it is the major piece of logic we extend for parallel bit streams.
 
 \section{LLVM Target-Independent Code Generator}
-The first stage for code generation is Instruction Selection, which translates LLVM code into the target-specific machine instructions. After that, there are machine level optimizations like live intervals analysis and register allocation. We focus on Instruction Selection and it is done by the following steps \cite{llvm_code_gen} (we would describe each step in the following text):
+The first stage for code generation is Instruction Selection, which translates LLVM code into the target-specific machine instructions. After that, there are machine level optimization like live-interval analysis and register allocation. We focus on Instruction Selection and it is done by the following steps \cite{llvm_code_gen} (we would describe each step in the following text):
 
 \begin{itemize}
   \item Initial SelectionDAG Construction: generate SelectionDAG from LLVM IR.
@@ -143,7 +157,7 @@ The first stage for code generation is Instruction Selection, which translates L
   \item Scheduling and Formation Phase
 \end{itemize}
 
-LLVM internally constructs a graph view of the input code called SelectionDAG where DAG is short for directed acyclic graph. Each node in the DAG represents an operation with an opcode, a number of operands and a number of return values. If a DAG node A uses the return value of the other DAG node B, an edge will be there from B to A. The SelectionDAG enables a large variety of very-low-level optimizations and also benefits the instruction scheduling process by recording the instruction dependency in the graph.
+LLVM internally constructs a graph view of the input code called SelectionDAG where DAG is short for directed acyclic graph. Each node in the DAG represents an operation with an opcode, a number of operands and a number of return values. If the DAG node A uses the return value of the other DAG node B, an edge will be there from B to A. The SelectionDAG enables a large variety of very-low-level optimization and also benefits the instruction scheduling process by recording the instruction dependency in the graph.
 
 There are DAG combine passes after the initial construction and each legalize phase\cite{llvm_code_gen}. We will explain "legality" in the next section. DAG combine passes clean up SelectionDAG with both general and machine-dependent strategies, making the work easier for initial constructor and legalizers: they can focus on generating accurate SelectionDAG, good and legal operations with no worries of the messy output.
 
