@@ -122,6 +122,7 @@ The IDISA library divides SIMD operations in the following categories \cite{idis
     \item Horizontal Operations (Template Class {\tt hsimd<w>}): Operations like packing align the two operands horizontally, extract a portion of the bits in operands and concatenate into one full SIMD register. (Figure~\ref{figure:horizontal})
     \item Expansion Operations (Template Class {\tt esimd<w>}): Operations that double the width of fields like merging which would take the higher 64 bits of the two operands (A and B), concatenate the first field from A and the first field from B and get a new field with the width doubled. Do the same to the following fields until a full SIMD register C is generated. (Figure~\ref{figure:expansion})
     \item Field Movement Operations (Template Class {\tt mvmd<w>}): Operations that copy and move the entire fields. The content of these fields would not change.
+    \item Full Register Operations (Template Class {\tt bitblock}): Operations that works with the contents of SIMD registers as undivided bit blocks.
 \end{itemize}
 
 The IDISA library claims to have better performance compared to the hand-written libraries and it is the main competitor of our LLVM back end.
