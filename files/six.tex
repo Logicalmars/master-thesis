@@ -14,7 +14,7 @@ In Chapter~\ref{four}, we present different approaches to lower $i1$, $i2$, $i4$
 
 \subsection{Methodology}
 
-Testing small pieces of critical code can be tricky, since the testing overhead can easily overwhelm the critical code and make the result meaningless. Dr. Agner Fog provides a test program which uses the Time Stamp Counter for clock cycles and Performance Monitor Counters for instruction count and other related events \cite{agner_testp}. We pick the reciprocal throughput as our measurement and it is measured with a sequence of same instructions where subsequent instructions are independent of the previous ones. In Dr. Fog's instruction table, he noted that a typical length of the sequence is 100 instructions of the same type and this sequence should be repeated in a loop if a larger number of instructions is desired.
+Testing small pieces of critical code can be tricky, since the testing overhead can easily overwhelm the critical code and make the result meaningless. Agner Fog provides a test program which uses the Time Stamp Counter for clock cycles and Performance Monitor Counters for instruction count and other related events \cite{agner_testp}. We pick the reciprocal throughput as our measurement and it is measured with a sequence of same instructions where subsequent instructions are independent of the previous ones. In Fog's instruction table, he noted that a typical length of the sequence is 100 instructions of the same type and this sequence should be repeated in a loop if a larger number of instructions is desired.
 
 We did one simple experiment with SIMD XOR ($xorps$) to validate this program. Refer to Figure~\ref{figure:testp_xor}, we measured the performance of executing different number of XOR instructions; they are organized into one for loop and we have checked the assembly code to make sure the XOR operations are not optimized away.
 
@@ -25,7 +25,7 @@ We did one simple experiment with SIMD XOR ($xorps$) to validate this program. R
 \label{figure:testp_xor}
 \end{figure}
 
-From the figure, we can see the instruction count and CPU cycles grows linearly with the number of XOR instructions. So we can conclude that Dr. Fog's test program can be used to compare two pieces of critical code: the one with more measured CPU cycles is more complex and have more instructions. Note that from the figure, it seems the throughput of $xorps$ is 4, which is different from Intel's document (3 in document). We found this may be related to the compiler optimization on the loop; when we flattened the loop we got the throughput around 2 to 3. In order to eliminate this undesired effect, we would flatten the test code in the following sections.
+From the figure, we can see the instruction count and CPU cycles grows linearly with the number of XOR instructions. So we can conclude that Fog's test program can be used to compare two pieces of critical code: the one with more measured CPU cycles is more complex and have more instructions. Note that from the figure, it seems the throughput of $xorps$ is 4, which is different from Intel's document (3 in document). We found this may be related to the compiler optimization on the loop; when we flattened the loop we got the throughput around 2 to 3. In order to eliminate this undesired effect, we would flatten the test code in the following sections.
 
 In the following sections, we would write micro benchmarks with Agner Fog's test program and compare reciprocal throughput between different implementation. Our test machine is X86 64-bit Ubuntu with Intel Haswell, and the detailed configuration can be found in Table~\ref{table:hardware_config}. In order to inline pure IR functions (instead of a function call into one object file), we compile all the test code into LLVM bit code (binary form of LLVM IR) and then link / optimize them together. The default compile flag is to use Intel SSE2 instruction set and on 64-bit OS.
 
@@ -167,23 +167,23 @@ xmlwf2 on Haswell & 4.11   &    4.49   &    4.69   &    4.978   &   5.308 \\ \hl
 \subsection{Long Stream Addition}
 We replaced the internal logic of big integer addition in Chapter~\ref{four} and introduced a new intrinsic: {\tt uadd.with.overflow.carryin}. We would evaluate them in this section by first comparing the long-stream addition algorithm with LLVM's original implementation and then doing some application level profile for the new intrinsic.
 
-We wrote micro benchmarks with Dr. Fog's test program and we put 200 independent additions on $i128$ and $i256$. It was tricky to make the test program right, we generated random data for the operands and we carefully inserted the carry-out bit back to the return value so that our long stream addition logic would not be optimized away. In order to be consistent throughout the comparison, we used the same compiler flag for all the runs ({\tt -mavx2} for gcc and {\tt -mattr=+avx2,+bmi2} for LLVM tool chain). The result is listed in Table~\ref{table:lsadd_micro}.
+We wrote micro benchmarks with Fog's test program and we put 200 independent additions on $i128$ and $i256$. It was tricky to make the test program right, we generated random data for the operands and we carefully inserted the carry-out bit back to the return value so that our long stream addition logic would not be optimized away. In order to be consistent throughout the comparison, we used the same compiler flag for all the runs ({\tt -mavx2} for gcc and {\tt -mattr=+avx2,+bmi2} for LLVM tool chain). The result is listed in Table~\ref{table:lsadd_micro}.
 
 \begin{table}[h]
 \centering
 \begin{tabular}{|c|c|c|}
 \hline
                              & Core CPU Cycles & Instructions \\ \hline
-Long stream addition on $i128$ & 3043            & 7952         \\ \hline
+Long stream addition on $i128$ & 2416            & 6552         \\ \hline
 LLVM on $i128$                 & 1455            & 4199         \\ \hline
-Long stream addition on $i256$ & 4103            & 10152        \\ \hline
+Long stream addition on $i256$ & 2656            & 6959        \\ \hline
 LLVM on $i256$                 & 4234            & 9798         \\ \hline
 \end{tabular}
 \caption{Micro benchmarks for long stream addition against LLVM's original implementation.}
 \label{table:lsadd_micro}
 \end{table}
 
-Long stream addition does not perform well on $i128$, since there is only two sequential additions involved (1 $addq$ and 1 $adcq$) and parallel computing would not save much but introduce complexity. However, we can see on $i256$ long stream addition has almost identical performance with the sequential implementation, which generates 1 $addq$ and 3 $adcq$. As the width of the operand doubles, the CPU cycles from LLVM increases to the rate of 2.91, while in the long stream addition, the rate is only 1.35, under 2; thus we could confidently predict that on the Intel AVX512, long stream addition on $i512$ would perform better than the sequential addition.
+Long stream addition does not perform well on $i128$, since there is only two sequential additions involved (1 $addq$ and 1 $adcq$) and parallel computing would not save much but introduce complexity. However, we can see on $i256$ long stream addition has better performance than the sequential one that generates 1 $addq$ and 3 $adcq$. As the width of the operand doubles, the CPU cycles from LLVM increases to the rate of 2.91, while in the long stream addition, the rate is only 1.10. Our algorithm scales better when the width of SIMD registers grows. We could confidently predict that on the Intel AVX512, long stream addition on $i512$ would out-perform the sequential one significantly.
 
 We then show application level profile of `icgrep' which is a tool for regular expression matching with bitwise data parallelism. The internal "add with carry" logic is replaced with one single intrinsic and the performance is plotted in Figure~\ref{figure:lsadd_icgrep}. The performance drops because that version of icgrep works with 128-bit SIMD registers and long stream addition does not work well on $i128$. We could expect better performance on wider SIMD registers.
 

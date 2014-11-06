@@ -7,23 +7,23 @@
 \chapter{Implementation}
 \label{five}
 
-In this Chapter, we will describe our realization of Parabix technology inside LLVM facility. LLVM is a well-structured open source compiler tool chain which is under rapid development. So during our implementation, we tried our best to follow its design principle while keeping our code modularized and isolated to be able to easily integrate with new versions of LLVM\@. Our goal of code design is to:
+In this Chapter, we describe our realization of Parabix technology inside LLVM facility. LLVM is a well-structured open source compiler tool chain which is under rapid development. So during our implementation, we tried our best to follow its design principle while keeping our code modularized and isolated to be able to easily integrate with new versions of LLVM\@. Our goal of code design is to:
 \begin{enumerate}
   \item Use general strategies across different types and operations to reduce repeated logic.
   \item Minimize code injection in the existing source and put Parabix logic in the separate module.
   \item Put our code in auto-generated, thorough test.
 \end{enumerate}
 
-Most of our code sits in LLVM Target-Independent Code Generator\cite{llvm_code_gen}. From Chapter~\ref{four}, we know that current type legalization process of LLVM have big performance penalty for small element vectors, so our approach would mark $i1$, $i2$ and $i4$ vector legal type first, and then handle them in Legalize Operation Phase. For convenience, we name this set of vector types \textit{Parabix Vector}.
+Most of our code sits in LLVM Target-Independent Code Generator\cite{llvm_code_gen}. From Chapter~\ref{four}, we know that current type legalization process of LLVM have big performance penalty for small element vectors, so our approach mark $i1$, $i2$ and $i4$ vector legal type first, and then handle them in Legalize Operation Phase. For convenience, we name this set of vector types \textit{Parabix Vector}.
 
 We walk through the following steps to mark a type legal on a certain target:
 \begin{itemize}
-  \item \textbf{Add new register class in target description file.} LLVM uses TableGen (.td files) to describe target information which allows the use of domain-specific abstractions to reduce repetition \cite{llvm_code_gen}. Registers are grouped into register classes which would further tie to a set of types. We introduced GR32X for 32-bit general register like EAX EBX for $v32i1$, GR64X for 64-bit general register like RAX RBX for $v64i1$, VR128PX for 128-bit vector register like XMM0 to XMM15 for $v128i1$, $v64i2$, $v32i4$  Types within the same register class can be bitcasted from one to the other, since they can actually reside in the same register.
+  \item \textbf{Add new register class in target description file.} LLVM uses TableGen (.td files) to describe target information which allows the use of domain-specific abstractions to reduce repetition \cite{llvm_code_gen}. Registers are grouped into register classes which further tie to a set of types. We introduced GR32X for 32-bit general register like EAX EBX for $v32i1$, GR64X for 64-bit general register like RAX RBX for $v64i1$, VR128PX for 128-bit vector register like XMM0 to XMM15 for $v128i1$, $v64i2$, $v32i4$  Types within the same register class can be bitcasted from one to the other, since they can actually reside in the same register.
 
   \item \textbf{Set calling convention.} They are two kinds of calling convention to set: return value and argument calling convention. For example, we instruct LLVM to assign $v64i2$ type return value to XMM0 to XMM3 registers, assign $v64i2$ argument type to XMM0 to XMM7 registers if we have SSE2 or to 16-byte stack slots otherwise.
 \end{itemize}
 
-Now Legalize Type Phase would recognize our $i1$, $i2$, $i4$ vectors as legal and pass them onto Legalize Operation Phase. We have two major methods to handle $i2^k$ vectors here: \textit{Custom Lowering} and \textit{DAG Combining}.
+Now Legalize Type Phase recognizes our $i1$, $i2$, $i4$ vectors as legal and pass them onto Legalize Operation Phase. We have two major methods to handle $i2^k$ vectors here: \textit{Custom Lowering} and \textit{DAG Combining}.
 
 \begin{figure}[ht!]
 \centering
