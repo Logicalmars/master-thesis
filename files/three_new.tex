@@ -1,7 +1,7 @@
 \chapter{Design Objectives}
 \label{three}
 
-In this chapter we will discuss about our overall goal for using LLVM as a new Parabix back end. First, we would show that the IDISA library could be replace by a pure target-independent IR library.
+In this chapter we discuss about our overall goal for using LLVM as a new Parabix back end. First, we show that the IDISA library could be replace by a pure target-independent IR library.
 
 To start, let us look at one IDISA vertical operation: {\tt simd<8>::add}. IDISA library implements this function with the compiler intrinsic that directly translates into the assembly code, so different header files have to be maintained for different instruction sets such as Program~\ref{prog:add_8_sse2} and Program~\ref{prog:add_8_neon}. However, with the LLVM IR, we can implement it as Program~\ref{prog:add_8_llvm}; no low level detail is specified here.
 
@@ -61,7 +61,7 @@ To start, let us look at one IDISA vertical operation: {\tt simd<8>::add}. IDISA
     ret <16 x i8> %r
   }
 \end{verbatim}
-\caption[Implementation of {\tt simd<8>::max} with LLVM IR]{Implementation of {\tt simd<8>::max} with LLVM IR. {\tt Select} would select elements according to the first operand: $\text{\tt r}_i=
+\caption[Implementation of {\tt simd<8>::max} with LLVM IR]{Implementation of {\tt simd<8>::max} with LLVM IR. {\tt Select} selects elements according to the first operand: $\text{\tt r}_i=
 \begin{cases}
     \text{\tt a}_i& \text{if } \text{\tt m}_i = 1\\
     \text{\tt b}_i& \text{otherwise}
@@ -77,7 +77,7 @@ Most of the IDISA vertical operations can be expressed with a few lines of IR co
     \item Operations that have no IR correspondence such as {\tt simd::min} and {\tt simd::max}. They can be emulated with a sequence of IR, e.g.\ {\tt simd<8>::max} in Program~\ref{prog:max}.
 \end{itemize}
 
-For horizontal operations, IDISA also needs to maintain target-specific logic. For example, to implement {\tt hsimd<16>::packh}, it uses unsigned saturation $packuswb$ for X86 SSE2 and uses $vuzpq\_u8$ for NEON; for X86 SSE series after SSSE3, it would use the instruction $pshufb$. The author of the IDISA library needs to know these instruction sets very well. On the other hand, LLVM IR introduces a powerful instruction which can express most of the horizontal and expansion operations. It is the \textit{shufflevector}.
+For horizontal operations, IDISA also needs to maintain target-specific logic. For example, to implement {\tt hsimd<16>::packh}, it uses unsigned saturation $packuswb$ for X86 SSE2 and uses $vuzpq\_u8$ for NEON; for X86 SSE series after SSSE3, it uses the instruction $pshufb$. The author of the IDISA library needs to know these instruction sets very well. On the other hand, LLVM IR introduces a powerful instruction which can express most of the horizontal and expansion operations. It is the \textit{shufflevector}.
 
 \begin{verbatim}
     <result> = shufflevector <n x <ty>> <v1>, <n x <ty>> <v2>, <m x i32> <mask>
@@ -112,11 +112,11 @@ The first two operands are vectors of the same type and their elements are numbe
 Program~\ref{program:packh_32} can be easily generalized for packing high on any power-of-two field width. For other horizontal operations:
 \begin{itemize}
     \item Packing low: the same bitcast need to be done but shufflevector with a different mask. E.g.\ {\tt hsimd<32>::packl} can be implemented with the mask {\tt 0, 2, 4, 6, 8, 10, 12, 14}.
-    \item Packing sign mask: it packs together all the sign bits from each field of the operand. This can be implemented with the less than comparison. E.g.\ {\tt hsimd<32>::signmask(a)} is equivalent to \verb|icmp slt <4 x i32> %a, <4 x i32> <i32 0, i32 0, i32 0, i32 0>| which would return a {\tt <4 x i1>} sign mask vector.
+    \item Packing sign mask: it packs together all the sign bits from each field of the operand. This can be implemented with the less than comparison. E.g.\ {\tt hsimd<32>::signmask(a)} is equivalent to \verb|icmp slt <4 x i32> %a, <4 x i32> <i32 0, i32 0, i32 0, i32 0>| which returns a {\tt <4 x i1>} sign mask vector.
     \item Other operations that require coding a sequence of IR like {\tt hsimd<32>::add\_hl(a, b)}. They are rarely used in the Parabix application.
 \end{itemize}
 
-Shufflevector and bitcast could also cover IDISA expansion operations. We list the IR code for {\tt esimd<16>::mergeh} in Program~\ref{prog:mergeh_16} and explain the indexes in Figure~\ref{fig:mergeh_16}. The program is self-explanatory and any programmer who understands shufflevector can understand its behavior easily.
+Shufflevector and bitcast could also cover IDISA expansion operations. We list the IR code for {\tt esimd<16>::mergeh} in Program~\ref{prog:mergeh_16} and explain the indexes in Figure~\ref{fig:mergeh_16}. The program is self-explanatory; any programmer who understands shufflevector can understand its behaviour easily.
 
 \begin{figure}[ht!]
 \centering
@@ -140,7 +140,7 @@ Shufflevector and bitcast could also cover IDISA expansion operations. We list t
 \label{prog:mergeh_16}
 \end{program}
 
-The rest expansion operations can be implemented as the following:
+The rest of the expansion operations can be implemented as the following:
 \begin{itemize}
     \item Merge low: similar to merge high but with a different shuffle mask. E.g.\ {\tt esimd<16>::mergel} uses the mask {\tt 0, 8, 1, 9, 2, 10, 3, 11}.
     \item Unary operations like sign extension and zero extension: LLVM has built-in instructions with the same name.
@@ -155,7 +155,7 @@ For field movement operations:
 
 The full register operations could be coded in large-size integers like $i128$ and $i256$. You can add / multiply / shift it as a normal integer. In fact, all the integer instructions LLVM support can be applied to them thus enabling more complexed operations that IDISA does not support.
 
-To sum up, with support of all the five categories of IDISA operations, we are able to replace the IDISA library with pure IR implementation. However, there is still one question to answer: since LLVM has its own C++ compiler called Clang and Clang could compile the C++ IDISA library into IR, what is the difference between the Clang-generated IR and our hand-written IR library? There are at least two major difference:
+To sum up, with support of all the five categories of IDISA operations, we are able to replace the IDISA library with pure IR implementation. However, there is still one question to answer: since LLVM has its own C++ compiler called Clang and Clang could compile the C++ IDISA library into IR, what is the difference between the Clang-generated IR and our hand-written IR library? There are at least three major difference:
 
 \begin{program}
 \begin{verbatim}
@@ -176,6 +176,8 @@ To sum up, with support of all the five categories of IDISA operations, we are a
 
 \begin{enumerate}
     \item Clang could not remove all the target-dependency from the C++ source. Not every IR instruction are target-independent. For example, IDISA function {\tt hsimd<8>::packh} compiles to Program~\ref{prog:packh_8_sse2_llvm} and all the functions that start with {\tt @llvm.x86.sse2} are only available on X86 SSE2. This is inherent to the use of direct compiler intrinsic in IDISA.
+    \newpage
+
     \item Illegal operations are handled in different level. Compare the following IR implementation for {\tt simd<4>::add}:
       \begin{center}
         \verb|add <32 x i4> %a, %b|
@@ -198,12 +200,14 @@ To sum up, with support of all the five categories of IDISA operations, we are a
         \end{verbatim}
       \end{center}
 
-    Given that addition on $v32i4$ is not supported by this target, the latter implements it with $v16i8$ addition and a few logic operations in the front end level. Target information is required. And even if the latter code is migrated to a target that supports $v32i4$ addition natively, it would not use that ability unless some fancy optimization could recognize the intention behind these 12 lines.
+    Given that addition on $v32i4$ is not supported by this target, the latter implements it with $v16i8$ addition and a few logic operations in the front end level. Target information is required. And even if the latter code is migrated to a target that supports $v32i4$ addition natively, it could not use that ability unless some fancy optimization could recognize the intention behind these 12 lines.
 
-    On the other hand, the former one-line code would not be extended until the legalization phase in the back end. The target-specific details are thus left to the back end. FRONT-END OPT.
+    On the other hand, the former one-line code is not extended until the legalization phase in the back end. The target-specific details are thus left to the back end.
+
+    \item Since the illegal operation is not extended until the back end, more optimizations are available. The high-level intention of the IR instruction is better preserved. Still for {\tt simd<4>::add}, if one of the operand is all zero, the front end could remove the single line of \verb|add <32 x i4>| more easily than removing the 12 lines of code in the Clang-generated IR\@. It is useful for constant combination as well as other peephole optimizations because it simplifies the pattern recognition. We give an example of peephole optimization on the long integer shifting in Chapter~\ref{five}.
 \end{enumerate}
 
-From this comparison, it is clear that our approach with hand-written IR library does not rely on any specification of the target. And since we preserve high-level code semantic better, we have better chance of utilizing the full machine instruction sets and keeping up with the hardware improvement.
+This comparison explains our design goal: to replace the IDISA library with a high-level target-independent IR library. It is different from the IDISA approach fundamentally in the way that it tries not to instruct the compiler how to implement this operation, but rather tell what to implement.
 
 The next question would be that could LLVM compile the IR library to efficient machine code? Experiments on X86 tells no. Simple functions that directly respond to native instructions like {\tt simd\_add\_8} in Program~\ref{prog:add_8_llvm} can be compiled correctly, but for some more complexed ones like shufflevector, where no target so far has native support for it, poor machine code might be generated (e.g.\ pack high for 16-bit fields). Furthermore, LLVM does not have good support for vectors of small element, simple code like \verb|add <128 x i1> %a, %b| would generate big amount of memory operations and eight additions on SIMD registers. To achieve a better code generation, we bring many of the strategies from IDISA to LLVM back end. The next two chapters would describe them in detail.
 
