@@ -7,7 +7,7 @@
 \chapter{Vector of $i2^k$}
 \label{four}
 
-Parabix operation works on full range of vector types. For 128-bit SIMD register, Parabix supports $v128i1$, $v64i2$, $v32i4$, \ldots, $v1i128$, we call them as the vector of $i2^k$. Vector type $vXi8$, $vXi16$, \ldots, $vXi64$ is widely used for multimedia processing, digital signal processing and Parabix technology, they are well supported by the LLVM infrastructure, but the rest vector type with smaller element does not have perfect implementation. For instance, $vXi1$ is a natural view of many processor operations, like AND, OR, XOR; they are bitwise operations. However, $v32i1$, $v64i1$ and $v128i1$ are all illegal on current LLVM 3.4 back end for X86 architecture. After seeing a $v128i1$ vector, Type Legalize Phase would promote element type $i1$ to $i8$, and then split the vector to fit 128 bits register size; thus the incoming $v128i1$ turns into 8 $v16i8$ vectors. If we write AND on 2 $v128i1$ vectors, LLVM would produce 8 pairs of AND on $v16i8$ and also operations to truncate and concatenate back the $v128i1$ result; while we can simply bitcast $v128i1$ to any legal 128-bit vector like $v4i32$, do AND on them and bitcast the result back to $v128i1$. The performance penalty of type legalization is high in this example. Another type legalization example of $v32i1$ can be found in Figure~\ref{figure:v32i1_legalize_type}.
+Parabix operation works on full range of vector types. For 128-bit SIMD register, Parabix supports $v128i1$, $v64i2$, $v32i4$, \ldots, $v1i128$, we call them as the vector of $i2^k$. Vector types $vXi8$, $vXi16$, \ldots, $vXi64$ are widely used for multimedia processing, digital signal processing and Parabix technology. They are well supported by the LLVM infrastructure, but the remaining vector type with smaller elements are not well-supported. For instance, $vXi1$ is a natural view of many processor operations, like AND, OR, XOR; they are bitwise operations. However, $v32i1$, $v64i1$ and $v128i1$ are all illegal on current LLVM 3.4 back end for X86 architecture. After seeing a $v128i1$ vector, the type legalization phase promotes element type $i1$ to $i8$, and then split the vector to fit 128 bits register size; thus the incoming $v128i1$ turns into 8 $v16i8$ vectors. For bitwise-and on 2 $v128i1$ vectors, LLVM produces 8 pairs of AND on $v16i8$ together with operations to truncate and concatenate back the $v128i1$ result; while we can simply bitcast $v128i1$ to any legal 128-bit vector like $v4i32$, perform the bitwise-and and bitcast the result back to $v128i1$. The performance penalty of type legalization is high in this example. Another type legalization example of $v32i1$ can be found in Figure~\ref{figure:v32i1_legalize_type}.
 
 \begin{figure}[ht!]
   \centering
@@ -16,28 +16,28 @@ Parabix operation works on full range of vector types. For 128-bit SIMD register
   \label{figure:v32i1_legalize_type}
 \end{figure}
 
-LLVM applies the same promote element strategy to vectors of $i2$ and $i4$, which would lead to huge SelectionDAG generation and thus poor machine code. On the other hand, $i1$, $i2$ and $i4$ vectors are important to Parabix performance-critical operations, such as transposition and deletion; Parabix applications, such as DNA sequence (ATCG pairs) matching which can be encoded into $i2$ vectors most efficiently, requires a better support of small element vectors. The inductive doubling instruction set architecture (IDISA) which is the ideal model for Parabix needs a core set of functions on the $i2^k$ vectors as the first key element. All these reasons motivate us to find better implementation of $i1$, $i2$ and $i4$ vectors.
+LLVM applies the same promote element strategy to vectors of $i2$ and $i4$, which leads to huge SelectionDAG generation and thus poor machine code. On the other hand, $i1$, $i2$ and $i4$ vectors are important to Parabix performance-critical operations, such as transposition and deletion; Parabix applications, such as DNA sequence (ATCG pairs) matching which can be encoded into $i2$ vectors most efficiently, requires a better support of small element vectors. The inductive doubling instruction set architecture (IDISA) which is the ideal model for Parabix needs a core set of functions on the $i2^k$ vectors as the first key element. All these reasons motivate us to find better implementation of $i1$, $i2$ and $i4$ vectors.
 
 \section{Redefine Legality}
 
-In Chapter~\ref{two} we know that LLVM has three ways to legalize vector types: Scalarization, Vector Widening and Vector Element Promotion. None of these strategies would legalize small element vectors properly. Think about $v32i1$, it fits in the general 32-bit registers, and we can not benefit from extending or splitting the vector in wider or more registers, not to mention scalarizing it. It would be the best to store $v32i1$ vectors just in the general 32-bit register and properly handle the operations on them.
+From Chapter~\ref{two} we know that LLVM has three ways to legalize vector types: Scalarization, Vector Widening and Vector Element Promotion. None of these strategies could legalize small element vectors properly. Think about $v32i1$: it fits in the general 32-bit registers, and we can not benefit from extending or splitting the vector in wider or more registers, not to mention scalarizing it. It is the best to store $v32i1$ vectors just in the general 32-bit register and properly handle the operations on them.
 
 So we want to redefine the type legality inside LLVM\@. Instead of having direct hardware intrinsic on it, we define a vector type which has the same size in bits with one of the target's registers to be a legal vector type. The definition of the illegal operation remains the same. Under this definition, $v32i1$ is legal on any 32-bit platform, $v64i1$ is legal on any 64-bit platform and $v64i2$ is legal on any platform with 128-bit SIMD registers.
 
-However, as more types are legal, we will need to handle more illegal operations. LLVM has the facility to "expand" an illegal operation, so that we do not need to implement every operation on the type. For example $v32i1$, we did not lower its shufflevector but we can still write shufflevector on $v32i1$ in IR, and LLVM could expand it into sequence of extracting and inserting vector elements. Of course the performance is not good at all. So the new question arises, what is the necessary operations set to fully support a legal type, that every possible IR statement with this type can be compiled into a native machine code?
+However, as more types are legal, we need to handle more illegal operations that are not directly supported by the processor. We implement every IR instruction that works on vectors except: (1) floating point instructions, because Parabix use integer operations exclusively. (2) division and remainder, because no Parabix operation require it. (3) shufflevector for vectors of small elements, because a general high-performance implementation of them are hard and unnecessary; instead we optimize some special cases that are used in the Parabix operations. To sum up, we implement the following instructions for the $i2^k$ vectors: (1) common binary functions listed in Table~\ref{table:semantics}; (2) basic vector operations like INSERT VECTOR ELT, EXTRACT VECTOR ELT and BUILD VECTOR\@.
 
-This question is hard to answer. In practice, we implemented (1) common binary functions listed in Table~\ref{table:vxi1}; (2) basic vector operations like INSERT VECTOR ELT, EXTRACT VECTOR ELT and BUILD VECTOR\@. All the meaningful test IR files we wrote work properly under this operations set.
+LLVM has the facility to "expand" an illegal operation, so that some operations we did not implement are still available. For example $v32i1$, we did not lower its shufflevector but we can still write shufflevector on $v32i1$ in IR\@. LLVM could expand it into a sequence of extracting and inserting vector elements. Of course the performance is not good at all. Efficient shufflevector support is possible with the new instructions PEXT and PDEP introduced in the Intel Haswell BMI2. According to \cite{lee2001efficient}, arbitrary $n$-bit permutation can be done using no more than $\lg n$ GRP instructions. It means for arbitrary $v32i1$ shufflevector, no more than 10 PEXTs, 5 ORs and 5 SHIFTs are needed.
 
 \section{In-place Lowering Strategy}
 
-With the redefined legality, we provide the fourth way to legalize vector type: In-place Lowering. It is called "in-place" because we do not rearrange the bit value of the vector data, we would rather look at the same data with a different type. A trivial example would be the logical operations on \verb|<32 x i1>|; we can simply bitcast \verb|<32 x i1>| to $i32$ and perform the same operation. Almost all the operations on $vXi1$ can be simulated with a few logic operations on $iX$ (except the basic vector operations) as listed in Table~\ref{table:vxi1}. Figure~\ref{figure:v32i1_compare} shows the overall process of lowering $v32i1$ addition.
+With the redefined legality, we provide the fourth way to legalize vector type: In-place Lowering. It is called "in-place" because we do not rearrange the bit value of the vector data, we look at the same data with a different type. A trivial example is the logical operations on \verb|<32 x i1>|; we can simply bitcast \verb|<32 x i1>| to $i32$ and perform the same operation. Almost all the operations on $vXi1$ can be simulated with a few logic operations on $iX$ (except the basic insert \& extract vector operations) as listed in Table~\ref{table:vxi1}. Figure~\ref{figure:v32i1_compare} shows the overall process of lowering $v32i1$ addition.
 
-In-place Lowering allows us to copy the vector between registers or shift the vector within the register boundary. But it is different from vector element promotion. Refer to the Figure~\ref{figure:v8i4_v8i8}, vector element promotion would require shifting different element with different offsets.
+In-place Lowering allows us to copy the vector between registers or shift the vector within the register boundary. But it is different from vector element promotion. Refer to the Figure~\ref{figure:v8i4_v8i8}, vector element promotion requires shifting different element with different offsets.
 
 \begin{figure}[ht!]
   \centering
   \includegraphics[width=150mm]{draw/v32i1_compare.png}
-  \caption[Comparison between LLVM default legalize process and in-place lowering.]{Comparison between LLVM default legalize process (left) and in-place lowering (right). The right marks $v32i1$ type legal and handles the operation ADD in the operation legalization phase. This will keep the data in the general registers without being promoted or expanded.}
+  \caption[Comparison between LLVM default legalize process and in-place lowering.]{Comparison between LLVM default legalize process (left) and in-place lowering (right). The right marks $v32i1$ type legal and handles the operation ADD in the operation legalization phase. This keeps the data in the general registers without being promoted or expanded.}
   \label{figure:v32i1_compare}
 \end{figure}
 
@@ -89,7 +89,7 @@ In-place Lowering allows us to copy the vector between registers or shift the ve
 \end{table}
 
 \subsection{Lowering for $vXi2$}
-Vector type $vXi2$ has important role in the IDISA model and Parabix transposition and inverse transposition. Ideal Three-Stage Parallel Transposition\cite{transposition} requires \verb|hsimd<4>::packh| and \verb|hsimd<4>::packl|, which can be implemented with shufflevectors on $v64i2$. Shufflevectors of $v64i2$ are also required by Ideal Inverse Transposition, for \verb|esimd<2>::mergeh| and \verb|esimd<2>::mergel|. Transposition is the first step of every parabix application\cite{inductive_doubling_principle} and it is the principle overhead for some application like regular expression matching\cite{rob_regex}. So good code generation for $vXi2$ is important.
+Vector type $vXi2$ has important role in the IDISA model and Parabix transposition and inverse transposition. Ideal Three-Stage Parallel Transposition\cite{transposition} requires \verb|hsimd<4>::packh| and \verb|hsimd<4>::packl|, which can be implemented with shufflevectors on $v64i2$. Shufflevectors of $v64i2$ are also required by Ideal Inverse Transposition, for \verb|esimd<2>::mergeh| and \verb|esimd<2>::mergel|. Transposition is the first step of every parabix application\cite{inductive_doubling_principle}. It is also a significant overhead for some application like regular expression matching\cite{rob_regex}. So good code generation for $vXi2$ is important.
 
 Lowering $vXi2$ is harder than $vXi1$, so we propose a systematic framework using logic and 1-bit shifting operations. Consider $A, B$ as two $i2$ integers, $A=a_0a_1$ and $B=b_0b_1$, we can construct a truth table for every operation $C = OP(A, B)$. We then calculate the first bit and the second bit of $C$ separately with the logic combinations of $a_0, a_1, b_0, b_1$ and turn this into \textit{Circuit Minimization Problem}: find minimized Boolean functions for $c_0$ and $c_1$. We use Quine-McCluskey algorithm\cite{johnson1981quine} to solve it; an example can be found in Table~\ref{table:quine}.
 
@@ -110,7 +110,7 @@ Lowering $vXi2$ is harder than $vXi1$, so we propose a systematic framework usin
     \multicolumn{3}{c}{$c_0 = (a_0 \oplus b_0) \oplus (a_1 \land b_1)$} \\
     \multicolumn{3}{c}{$c_1 = a_1 \oplus b_1$}
   \end{tabular}
-  \caption{Truth table of ADD on 2-bit integers and the minimized Boolean functions for $C$.}
+  \caption{Truth-table of ADD on 2-bit integers and the minimized Boolean functions for $C$.}
   \label{table:quine}
 \end{table}
 
@@ -130,7 +130,7 @@ So $c_0 = (a_0 \oplus b_0) \oplus (a_1 \land b_1)$ becomes $(A \oplus B) \oplus 
     \item Keep all the logic operations.
 \end{itemize}
 
-Program~\ref{program:genloweradd} is the actual custom code to lower $v64i2$ addition. One thing to mention here is that we deploy a template system to automatically generate custom lowering code and the corresponding testing code. We would describe the template system later in Chapter~\ref{five}.
+Program~\ref{program:genloweradd} is the actual custom code to lower $v64i2$ addition. One thing to mention here is that we deploy a template system to automatically generate custom lowering code and the corresponding testing code. We describe the template system later in Chapter~\ref{five}.
 
 \begin{program}
 \begin{verbatim}
@@ -162,7 +162,7 @@ static SDValue GENLowerADD(SDValue Op, SelectionDAG &DAG) {
 \subsection{Inductive Doubling Principle For $i4$ Vector}
 Now we have better code generation for $vXi1$ and $vXi2$, $vXi4$ vectors are our next optimization target. Shufflevectors of $vXi4$ are used in \verb|hsimd<8>::packh|, \verb|hsimd<8>::packl| and \verb|esimd<4>::mergeh|, which are required by Ideal Three-Stage Transposition / Inverse Transposition; $vXi4$ is also the critical part of the IDISA model. But unfortunately, the strategies discussed above cannot be applied to $vXi4$ efficiently.
 
-Circuit Minimization Problem is NP-hard\cite{wiki_quine, kabanets2000circuit}. For $vXi4$, we would have 4 Boolean functions of 8 variables: $c_i = f_i(a_0, a_1, a_2, a_3, b_0, b_1, b_2, b_3), i \in \left\{{0, 1, 2, 3}\right\}$, and it is known that most Boolean functions on $n$ variables have circuit complexity at least $2^n/n$\cite{kabanets2000circuit} and we need 1-bit, 2-bit, 3-bit shifting on $A$, $B$. So the framework on $vXi2$ could not generate efficient code for us at this time. Instead, we introduce \textit{Inductive Doubling Principle} \cite{inductive_doubling_principle} and we will show that this general principle can be applied for $vXi4$ and even wider vector element type, e.g.\ multiplication on $v16i8$, to get better performance.
+Circuit Minimization Problem is NP-hard\cite{wiki_quine, kabanets2000circuit}. For $vXi4$, 4 Boolean functions of 8 variables are necessary: $c_i = f_i(a_0, a_1, a_2, a_3, b_0, b_1, b_2, b_3), i \in \left\{{0, 1, 2, 3}\right\}$. It is known that most Boolean functions on $n$ variables have circuit complexity at least $2^n/n$\cite{kabanets2000circuit} and we need 1-bit, 2-bit, 3-bit shifting on $A$, $B$. So the framework on $vXi2$ could not generate efficient code for us at this time. Instead, we introduce \textit{Inductive Doubling Principle} \cite{inductive_doubling_principle} and we show that this general principle can be applied for $vXi4$ and even wider vector element type, e.g.\ multiplication on $v16i8$, to get better performance.
 
 \begin{figure}[ht!]
 \centering
@@ -178,10 +178,10 @@ Circuit Minimization Problem is NP-hard\cite{wiki_quine, kabanets2000circuit}. F
 \label{figure:v8i4_v8i8}
 \end{figure}
 
-We use $v32i4$ as an example to illustrate Inductive Doubling Principle. To legalize $v32i4$, LLVM would promote this type into $v32i8$, widen every element to $i8$ and shift every element except the first one. Figure~\ref{figure:v8i4_v8i8} shows an example of widening $v8i4$ into $v8i8$, we can see unnecessary movement of vector element during widening. On a platform with 128 bits SIMD register, $v32i8$ will further be divided into two $v16i8$ and take 2 registers to hold, while the original type $v32i4$ has 128 bits in size and should be able to reside in only 1 register. Inductive Doubling Principle could achieve the latter for us. It would bitcast the vector in-place, view the same register as $v16i8$ type and emulate $i4$ operations with $i8$; e.g.\ in Figure~\ref{figure:add_4}, to get \verb|add <32 x i4> %a, %b|, we calculate $c_0, c_2, \ldots, c_{30}$ (high 4 bits in each $i8$ element) and $c_1, c_3, \ldots, c_{31}$ (low 4 bits in each $i8$ element) separately with 2 $v16i8$ additions:
+We use $v32i4$ as an example to illustrate Inductive Doubling Principle. To legalize $v32i4$, LLVM promotes this type into $v32i8$, widen every element to $i8$ then shift every element except the first one. Figure~\ref{figure:v8i4_v8i8} shows an example of widening $v8i4$ into $v8i8$, we can see unnecessary movement of vector element during widening. On a platform with 128 bits SIMD register, $v32i8$ is further divided into two $v16i8$ and requires 2 registers to hold, while the original type $v32i4$ has 128 bits in size and should be able to reside in only 1 register. Inductive Doubling Principle could achieve the latter for us. It bitcasts the vector in-place, view the same register as $v16i8$ type and emulate $i4$ operations with $i8$; e.g.\ in Figure~\ref{figure:add_4}, to get \verb|add <32 x i4> %a, %b|, we calculate $c_0, c_2, \ldots, c_{30}$ (high 4 bits in each $i8$ element) and $c_1, c_3, \ldots, c_{31}$ (low 4 bits in each $i8$ element) separately with 2 $v16i8$ additions:
 
 \begin{gather}
-C = IFH1(HiMask_8, A \land HiMask_8 + B \land HiMask_8, A + B) \\
+C = \text{\tt IFH1}(HiMask_8, A \land HiMask_8 + B \land HiMask_8, A + B) \\
 HiMask_8 = (1111000011110000 \ldots 11110000)_2
 \end{gather}
 
@@ -190,7 +190,7 @@ So we can emulate SIMD operations on $iX$ vectors with $iX/2$ or $i2X$ vector op
 \begin{table}[h]
 \centering
 \begin{tabular}{ccc}
-\multicolumn{3}{c}{$C = IFH1(HiMask_8, HiBits, LowBits)$} \\ \hline
+\multicolumn{3}{c}{$C = \text{\tt IFH1}(HiMask_8, HiBits, LowBits)$} \\ \hline
 \multicolumn{1}{|c|}{\multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}Operation\\ $v32i4$\end{tabular}}} & \multicolumn{1}{c|}{$HiBits$} & \multicolumn{1}{c|}{$LowBits$} \\ \cline{2-3}
 \multicolumn{1}{|c|}{} & \multicolumn{2}{c|}{All operation is on $v16i8$} \\ \hline
 \multicolumn{1}{|c|}{MUL} & \multicolumn{1}{c|}{$MUL(A >> 4, B >>4) << 4$} & \multicolumn{1}{c|}{Default} \\ \hline
@@ -205,11 +205,11 @@ So we can emulate SIMD operations on $iX$ vectors with $iX/2$ or $i2X$ vector op
 \multicolumn{1}{l}{} & \multicolumn{2}{l}{$HiMask_8 = (11110000 \ldots 11110000)_2$} \\
 \multicolumn{1}{l}{} & \multicolumn{2}{l}{$LowMask_8 = (00001111 \ldots 00001111)_2$}
 \end{tabular}
-\caption[Algorithm to lower $v32i4$ operations.]{Algorithm to lower $v32i4$ operations. The legalization input is $c = OP(a, b)$, where $a, b, c$ are $v32i4$ vectors. $A, B, C$ is the bitcasted results from $a, b, c$ and they are all $v16i8$ type.}
+\caption[Algorithm to lower $v32i4$ operations.]{Algorithm to lower $v32i4$ operations. The legalization input is $c = OP(a, b)$, where $a, b, c$ are $v32i4$ vectors. $A, B, C$ is the bitcasted results from $a, b, c$. They are all $v16i8$ type.}
 \label{table:vXi4}
 \end{table}
 
-Furthermore, this method is applicable to vectors of wider element type. Multiplication on $v16i8$, for example, generates poor code on LLVM 3.4 (Program~\ref{program:mult_8}): the vectors are finally scalarized and 16 multiplications on $i8$ elements are generated. With in-place promotion, we bitcast the operands into $v8i16$ and generates 2 SIMD multiplications ($pmullw$) instead.
+Furthermore, this method is applicable to vectors of wider element type. Multiplication on $v16i8$, for example, generates poor code on LLVM 3.4 (Program~\ref{program:mult_8}): the vectors are finally scalarized and 16 multiplications on $i8$ elements are generated. With in-place promotion, we bitcast the operands into $v8i16$ and generate 2 SIMD multiplications ($pmullw$) instead.
 
 \begin{program}
 \begin{verbatim}
@@ -219,6 +219,8 @@ entry:
   ret <16 x i8> %c
 }
 \end{verbatim}
+\rule{\textwidth}{1pt}
+
 \begin{multicols}{2}
 \begin{verbatim}
 # LLVM 3.4 default:
@@ -251,6 +253,8 @@ entry:
   ...
   ...
   (16 mulb blocks in total)
+
+            (a)
 \end{verbatim}
 \columnbreak
 \begin{verbatim}
@@ -267,13 +271,15 @@ entry:
   pand▸   %xmm3, %xmm0
   por▸    %xmm4, %xmm0
   retq
+
+            (b)
 \end{verbatim}
 \end{multicols}
-\caption[Inductive doubling principle on $v16i8$ multiplication.]{Inductive doubling principle on $v16i8$ multiplication. LLVM 3.4 generate poor machine code, which will $pextrb$ every $i8$ field and multiply them with $mulb$. We simplify it through 2 $pmullw$, which is the multiplication on $v8i16$.}
+\caption[Comparison of the compiled machine code of $v16i8$ multiplication between LLVM 3.4 and inductive doubling principle.]{LLVM 3.4 generate poor machine code for $v16i8$ multiplication. (a) is the generated code from LLVM 3.4. It $pextrb$ every $i8$ field and multiply them with $mulb$. The overall process in (a) is sequential. (b) is the generated code from inductive doubling principle. In (b), two $pmullw$ which is the multiplication on $v8i16$ are used to improve performance.}
 \label{program:mult_8}
 \end{program}
 
-However, the algorithm in Table~\ref{table:vXi4} cannot guarantee the best performance. Addition on $v32i4$ requires 2 $v16i8$ additions, but we can actually implement it with one. Look back to Figure~\ref{figure:add_4}, we need to mask out $a_1$, $b_1$ and do add again, because $a_1 + b_1$ may produce carry bit to the high 4 bits. If we mask out only the high bit of $a_1$ and $b_1$, still we will not produce carry and we can calculate $c_0$ and $c_1$ together in one $v16i8$ addition. All we need to solve is how to put the high bit back. The following equations describe the 1-add algorithm:
+However, the algorithm in Table~\ref{table:vXi4} cannot guarantee the best performance. Addition on $v32i4$ requires 2 $v16i8$ additions, but we can actually implement it with one. Look back to Figure~\ref{figure:add_4}, we need to mask out $a_1$, $b_1$ and do add again, because $a_1 + b_1$ may produce carry bit to the high 4 bits. If we mask out only the high bit of $a_1$ and $b_1$, still we do not produce carry and we can calculate $c_0$ and $c_1$ together in one $v16i8$ addition. All we need to solve is how to put the high bit back. The following equations describe the 1-add algorithm:
 
 \begin{gather}
   m = (10001000 \ldots 1000)_2 \\
@@ -283,14 +289,14 @@ However, the algorithm in Table~\ref{table:vXi4} cannot guarantee the best perfo
   r = r \oplus A_h \oplus B_h \label{eq:1_add_r}
 \end{gather}
 
-Equation~\eqref{eq:1_add_z} uses only one $v16i8$ addition and equation~\eqref{eq:1_add_r} put the high bit back. Our vector legalization framework is flexible enough that we can choose to legalize $v32i4$ addition with 1-add algorithm while keeping the rest $v32i4$ operations under general in-place promotion strategy. We will discuss our framework implementation in Chapter~\ref{five}.
+Equation~\eqref{eq:1_add_z} uses only one $v16i8$ addition and equation~\eqref{eq:1_add_r} put the high bit back. Our vector legalization framework is flexible enough that we can choose to legalize $v32i4$ addition with 1-add algorithm while keeping the remaining $v32i4$ operations under general in-place promotion strategy. We discuss our framework implementation in Chapter~\ref{five}.
 
 \section{LLVM Vector Operation of $i2^k$}
-In addition to the binary operations listed in Table~\ref{table:semantics}, LLVM provides convenient vector operations like \textit{insertelement}, \textit{extractelement} and \textit{shufflevector}, internally, they are DAG node INSERT VECTOR ELT, EXTRACT VECTOR ELT and VECTOR SHUFFLE\@. Another important internal node is BUILD VECTOR\@. In this section, we will discuss how to custom lower these nodes on $i2^k$ vectors.
+In addition to the binary operations listed in Table~\ref{table:semantics}, LLVM provides convenient vector operations like \textit{insertelement}, \textit{extractelement} and \textit{shufflevector}, internally, they are DAG node INSERT VECTOR ELT, EXTRACT VECTOR ELT and VECTOR SHUFFLE\@. Another important internal node is BUILD VECTOR\@. In this section, we discuss how to custom lower these nodes on $i2^k$ vectors.
 
-BUILD VECTOR takes an array of scalars as input and output a vector with these scalars as elements. Take $v64i2$ vector on X86 SSE2 architecture for an example; ideally, the input would provide an array of 64 $i2$ scalars and BUILD VECTOR assembles them into a $v64i2$ vector. More specifically, since $i2$ is illegal on all X86 architecture, the legal input is actually 64 $i8$ scalars. The naive approach would be creating an "empty" $v64i2$ vector, truncating every $i8$ into $i2$ and inserting it into the proper location of the "empty" vector. We propose a better approach by rearranging the index.
+BUILD VECTOR takes an array of scalars as input and returns a vector with these scalars as elements. Take $v64i2$ vector on X86 SSE2 architecture for an example; ideally, the input provides an array of 64 $i2$ scalars and they are then assembled into a $v64i2$ vector. More specifically, since $i2$ is illegal on all X86 architecture, the legal input is actually 64 $i8$ scalars. The naive approach is to create an "empty" $v64i2$ vector, truncate every $i8$ into $i2$ and insert them into the proper location of the "empty" vector. We propose a better approach by rearranging the index.
 
-Let us denote the input array as $a_0, a_1, \ldots, a_{63}$, $a_i$ is all $i8$. We rearrange them according to Table~\ref{table:build_vector} and build 4 $v16i8$ vectors $V_1, V_2, V_3, V_4$. The final build result is:
+Let us denote the input array as $a_0, a_1, \ldots, a_{63}$, $a_i$ are all $i8$. We rearrange them according to Table~\ref{table:build_vector} and build 4 $v16i8$ vectors $V_1, V_2, V_3, V_4$. The final build result is:
 \begin{equation}
   V = V_1 \lor (V_2 << 2) \lor (V_3 << 4) \lor (V_4 << 6)
 \end{equation}
@@ -310,7 +316,7 @@ $a_{63}$ & $\ldots$ & $a_{15}$ & $a_{11}$ & $a_7$ & $a_3$ & $V_4$ \\ \cline{1-6}
 
 SIMD OR and SHL are used in this formula, thus improving the performance by parallel computing. Rearranging index approach can be easily generalized to fit BUILD VECTOR of $v128i1$ and $v32i4$.
 
-EXTRACT VECTOR ELT takes 2 operands, a vector $V$ and an index $i$. It returns the $i_{th}$ element of $V$. The semantics would not allow much parallelism in the implementation. On X86 architecture, there are built-in intrinsic to extract vector element, such as $pextrb$ ($i8$), $pextrw$ ($i16$), $pextrd$ ($i32$) and $pextrq$ ($i64$); for smaller element type, we could extract the wider integer that contains it, shift the small element to the lowest bits and truncate. Following algorithm gives an example of extracting the $i_{th}$ element from the $v64i2$ vector {\tt V}.
+EXTRACT VECTOR ELT takes 2 operands, a vector $V$ and an index $i$. It returns the $i_{th}$ element of $V$. The semantic does not allow much parallelism in the implementation. On X86 architecture, there are built-in intrinsic to extract vector element, such as $pextrb$ ($i8$), $pextrw$ ($i16$), $pextrd$ ($i32$) and $pextrq$ ($i64$); for smaller element type, we could extract the wider integer that contains it, shift the small element to the lowest bits and truncate. Following algorithm gives an example of extracting the $i_{th}$ element from the $v64i2$ vector {\tt V}.
 
 \begin{itemize}
   \item Bitcast {\tt V} to $v4i32$ {\tt V'} and extract the proper $i32$ {\tt E}. Since every $i32$ contains 16 $i2$ elements, the index of {\tt E} is $\lfloor i / 16 \rfloor$.
@@ -343,19 +349,34 @@ INSERT VECTOR ELT is similar, it takes 3 operands, a vector $V$, an index $i$ an
   \[\text{\tt R} = \text{\tt insert element V', E',} \lfloor i / 16 \rfloor \]
 \end{itemize}
 
-We have discussed VECTOR SHUFFLE in Chapter~\ref{three}. We did not develop a general lowering strategy for the small element VECTOR SHUFFLE\@. In stead, we focused more on special cases that matter to Parabix critical operations, we optimized those cases to match performance of the hand-written library.
+We have discussed VECTOR SHUFFLE in Chapter~\ref{three}. We did not develop a general lowering strategy for the small element VECTOR SHUFFLE\@. Instead, we focused more on special cases that matter to Parabix critical operations, we optimized those cases to match performance of the hand-written library.
 
 \section{Long Stream Addition}
-Parabix technology has the concept of adding 2 unbounded streams and of course this needs to be translated into an block-at-a-time implementation\cite{rob_regex}. One important operation is unsigned addition of 2 SIMD registers with carry-in and carry-out bit e.g.\ \verb|add i128 %a, %b| or \verb|add i256 %a, %b| with $i1$ carry-in bit \verb:c_in: and generates $i1$ carry-out bit \verb:c_out:. Dr Cameron developed a general model using SIMD methods for efficient long-stream addition up to 4096 bits in \cite{rob_regex}.
+Parabix technology has the concept of adding 2 unbounded streams and of course this needs to be translated into a block-at-a-time implementation\cite{rob_regex}. One important operation is unsigned addition of 2 SIMD registers with carry-in and carry-out bit e.g.\ \verb|add i128 %a, %b| or \verb|add i256 %a, %b| with $i1$ carry-in bit \verb:c_in: and generates $i1$ carry-out bit \verb:c_out:. Cameron et al\cite{rob_regex} developed a general model using SIMD methods for efficient long-stream addition up to 4096 bits.
 
-In this section, we will replace the internal logic of wide integer addition ($i128$, $i256$ etc. ) of LLVM with the Parabix long-stream addition. Same with Dr Cameron's work in \cite{rob_regex}, we assume the following SIMD operations on $i64$ vectors legal on the target:
+In this section, we replace the internal logic of wide integer addition ($i128$, $i256$ etc. ) of LLVM with the Parabix long-stream addition. Following Cameron at el\cite{rob_regex}, we assume the following SIMD operations on $i64$ vectors legal on the target:
 \begin{itemize}
     \item \verb|add <N x i64> X, Y|, where $\text{\tt N} = RegisterSize / 64$. SIMD addition on each corresponding element of the $i64$ vectors, no carry bits could cross the element boundary.
     \item \verb|icmp eq <N x i64> X, -1|: compare each element of {\tt X} with the all-one constant, returning an \verb|<N x i1>| result.
     \item \verb|signmask <N x i64> X|: collect all the sign bit of $i64$ elements into a compressed \verb|<N x i1>| vector. From the LLVM speculation, this operation is equivalent to \verb|icmp lt <N x i64> X, 0|, which is the signed less-than comparison of each $i64$ element with 0. In the real implementation we use target-specific operations for speed, e.g. $movmsk\_pd$ for SSE2 and $movmsk\_pd\_256$ for AVX.
     \item Normal bitwise logic operations on \verb|<N x i1>| vectors. For small {\tt N}, native support may not exist, so we bitcast \verb|<N x i1>| to $iN$ and then zero extend it to $i32$. This conversion could also help with the 1-bit shift we use later.
-    \item \verb|zext <N x i1> m to <N x i64>|: this corresponds to \verb|simd<64>::spread(X)| in \cite{rob_regex}, which would distribute the {\tt N} bits of the mask, one bit each to the lower end of the {\tt N} $i64$ elements.
+    \item \verb|zext <N x i1> m to <N x i64>|: this corresponds to \verb|simd<64>::spread(X)| in \cite{rob_regex}. The internal logic of LLVM zero extension for $vNi1$ is not good enough, so we implement our own. An example of $v2i1$ is in Table~\ref{table:spread_v2i1}.
 \end{itemize}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|r|}
+\hline
+\multicolumn{2}{|c|}{Spread 2-bit value $(\text{\tt ab})_2$ to $v2i64$} \\ \hline
+$M_0$                                                       & \verb'ab'              \\ \hline
+$M_1 = M_0 \times \text{\tt 0x8001}$                        & \verb'...............ab.............ab' \\ \hline
+$M_2 = M_1 \land  \text{\tt 0x10001}$                       & \verb'...............a...............b' \\ \hline
+$M_3 = $ \text{\tt bitcast} $M_2$ \text{\tt to} $v2i16$     & \verb'<2 x i16> <i16 a, i16 b>' \\ \hline
+$M_4 = $ \text{\tt zext} $M_3$ \text{\tt to} $v2i64$        & \verb'<2 x i64> <i64 a, i64 b>' \\ \hline
+\end{tabular}
+\caption{Example of spreading $v2i1$ to $v2i64$}
+\label{table:spread_v2i1}
+\end{table}
 
 We then present the long stream addition of 2 $N \times 64$ bit values {\tt X} and {\tt Y} with these operations as the following.
 \begin{enumerate}
@@ -375,7 +396,7 @@ We then present the long stream addition of 2 $N \times 64$ bit values {\tt X} a
     \[\text{\tt S} = \text{\tt zext <N x i1> i to <N x i64>}\]
     \[\text{\tt Z} = \text{\tt add <N x i64> R, S}\]
     \[\text{\tt c\_out} = \text{\tt i >> N}\]
-    One note here for the mask type: {\tt c} and {\tt i} are literally all \verb|<N x i1>| vectors, but we actually bitcast and zero extend them into $i32$. This is useful in the formula {\tt c*2+c\_in}, {\tt MatchStart} and {\tt i >> N}; in fact, after we shift left {\tt c} by {\tt c*2}, we already have an $N+1$ bit integer which will not fit in \verb|<N x i1>| vector. The same is true for {\tt i}; so when we write {\tt zext <N x i1> i to <N x i64>}, there is an implicit truncating to get the lower {\tt N} bits of {\tt i}, but when we shift right {\tt i} by {\tt i >> N}, we do not do such truncation.
+    One note here for the mask type: {\tt c} and {\tt i} are literally all \verb|<N x i1>| vectors, but we actually bitcast and zero extend them into $i32$. This is useful in the formula {\tt c*2+c\_in}, {\tt MatchStart} and {\tt i >> N}; in fact, after we shift left {\tt c} by {\tt c*2}, we already have an $N+1$ bit integer which does not fit in \verb|<N x i1>| vector. The same is true for {\tt i}; so when we write {\tt zext <N x i1> i to <N x i64>}, there is an implicit truncating to get the lower {\tt N} bits of {\tt i}, but when we shift right {\tt i} by {\tt i >> N}, we do not do such truncation.
 \end{enumerate}
 
 LLVM internally implement long integer addition with a sequence of ADDC and ADDE, which is just chained 64-bit additions (or 32-bit additions on 32-bit target). We replace that with the long stream addition model thus improving the performance by parallel computing. As the hardware evolves, wider SIMD registers would be introduced, like 512-bit register in Intel AVX512, our general implementation could easily adopt this change in hardware and add two $i512$ in constant time.
