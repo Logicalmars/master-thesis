@@ -3,15 +3,16 @@
 %     Chapter 7
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \chapter{Conclusion}
 \label{seven}
 
-In this thesis, LLVM as a new back end is introduced to the Parabix technology and a target-independent IR library of critical Parabix operations has been developed. Introducing LLVM brings in mature inter-procedure optimization and just-in-time compilers and outsources the machine-level code generation from the Parabix framework.
+In this thesis, LLVM as a new back end is introduced to the Parabix technology. A target-independent IR library of critical Parabix operations is also developed. LLVM brings in mature inter-procedure optimization, just-in-time compilers and outsources the machine-level code generation from the Parabix framework.
 
-A systematic support for the vector of $i2^k$ has also been developed to extend the LLVM code generator with the IDISA model and a new LLVM intrinsic is added to enable chained additions on unbounded bit streams, which can be used for a broad category of applications. In one specific target: Intel X86, efficient native code has been generated and the performance is as good as the well-tuned IDISA library. In some micro-benchmarks, it even achieves 300 times speedup over the unmodified LLVM\@. Performance improvement over different sub-targets (e.g.\ X86 SSE2 and AVX2) has been witnessed without any change in the IR library.
+A systematic support for the vector of $i2^k$ is developed to extend the LLVM code generator with the IDISA model. A new LLVM intrinsic is added to enable chained additions on unbounded bit streams, which can be used for a broad category of applications. Long stream addition as well as shifting algorithms are built into the LLVM back end. In one specific target: Intel X86, efficient native code has been generated and the performance is as good as the well-tuned IDISA library. In some micro-benchmarks, it even achieves 300 times speed up over the unmodified LLVM\@. Performance improvement over different sub-targets (e.g.\ X86 SSE2 and AVX2) has been witnessed without any change in the IR library.
 
-With the LLVM back end, new optimization passes for the Parabix can be developed. As one of the major reasons for its high performance, Parabix uses long sequence of bitwise logic and shift operations without any branch or loop statement. Specific optimization like new register allocation algorithm may benefit this style of programming much more than the general programs. A peephole optimizer may be added to LLVM to combine a sequence of operations into one compact SIMD intrinsic available on the particular target.
+Although we tried hard to keep our extension to LLVM modularized and separated, our code is not able to merge with the newest LLVM trunk. One of the major reason is that we redefined legality which involves small code changes in many places. We need to further track these changes in the future.
+
+For more future work, new optimization passes for the Parabix can be developed. As one of the major reasons for its high performance, Parabix uses long sequence of bitwise logic and shift operations without any branch or loop statement. Specific optimization like new register allocation algorithm may benefit this style of programming very much. More peephole optimizers may be added to LLVM to combine sequences of operations into compact SIMD intrinsics.
 
 Parabix with LLVM has better chances to target at different platforms efficiently such as the SPARC servers from the Sun and the ARM mobile platform. Further extension of the LLVM code generator can be done in the future for these platforms.
 

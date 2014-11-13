@@ -15,9 +15,419 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Appendices:IDISA Vertical Operations in LLVM IR}\label{app:one}
+\chapter{Appendices: Example Code From The IR Library}\label{app:one}
 
+\section{Transposition With Byte-Pack Algorithm}
+\label{appone:transposition}
 
+\begin{lstlisting}
+define <4 x i32> @packh_16(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <16 x i8>
+  %bb = bitcast <4 x i32> %b to <16 x i8>
+  %rr = shufflevector <16 x i8> %bb, <16 x i8> %aa, <16 x i32> <i32 1,
+        i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15, i32 17,
+        i32 19, i32 21, i32 23, i32 25, i32 27, i32 29, i32 31>
 
+  %rr1 = bitcast <16 x i8> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
 
+define <4 x i32> @packl_16(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <16 x i8>
+  %bb = bitcast <4 x i32> %b to <16 x i8>
+  %rr = shufflevector <16 x i8> %bb, <16 x i8> %aa, <16 x i32> <i32 0,
+        i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14, i32 16,
+        i32 18, i32 20, i32 22, i32 24, i32 26, i32 28, i32 30>
 
+  %rr1 = bitcast <16 x i8> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @ifh_1(<4 x i32> %cond, <4 x i32> %b, <4 x i32> %c)
+alwaysinline {
+entry:
+  %not_cond = xor <4 x i32> %cond, <i32 -1, i32 -1, i32 -1, i32 -1>
+
+  %t0 = and <4 x i32> %cond, %b
+  %t1 = and <4 x i32> %not_cond, %c
+  %r = or <4 x i32> %t0, %t1
+
+  ret <4 x i32> %r
+}
+
+define <4 x i32> @srli_16(<4 x i32> %a, <8 x i16> %shift_mask)
+alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <8 x i16>
+  %r0 = lshr <8 x i16> %aa, %shift_mask
+  %rr = bitcast <8 x i16> %r0 to <4 x i32>
+  ret <4 x i32> %rr
+}
+
+define <4 x i32> @slli_16(<4 x i32> %a, <8 x i16> %shift_mask)
+alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <8 x i16>
+  %r0 = shl <8 x i16> %aa, %shift_mask
+  %rr = bitcast <8 x i16> %r0 to <4 x i32>
+  ret <4 x i32> %rr
+}
+
+define void @s2p_step_ir(<4 x i32> %s0, <4 x i32> %s1,
+  <4 x i32> %hi_mask, <8 x i16> %shift_mask, <4 x i32>* %p0,
+  <4 x i32>* %p1) alwaysinline {
+entry:
+  %t0 = call <4 x i32> @packh_16(<4 x i32> %s0, <4 x i32> %s1)
+  %t1 = call <4 x i32> @packl_16(<4 x i32> %s0, <4 x i32> %s1)
+
+  %t2 = call <4 x i32> @srli_16(<4 x i32> %t1, <8 x i16> %shift_mask)
+  %q0 = call <4 x i32> @ifh_1(<4 x i32> %hi_mask, <4 x i32> %t0,
+                              <4 x i32> %t2)
+  %t3 = call <4 x i32> @slli_16(<4 x i32> %t0, <8 x i16> %shift_mask)
+  %q1 = call <4 x i32> @ifh_1(<4 x i32> %hi_mask, <4 x i32> %t3,
+                              <4 x i32> %t1)
+
+  store <4 x i32> %q0, <4 x i32>* %p0
+  store <4 x i32> %q1, <4 x i32>* %p1
+
+  ret void
+}
+
+define <8 x i16> @const16_1() alwaysinline {
+entry:
+  ret <8 x i16> <i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1, i16 1>
+}
+
+define <8 x i16> @const16_2() alwaysinline {
+entry:
+  ret <8 x i16> <i16 2, i16 2, i16 2, i16 2, i16 2, i16 2, i16 2, i16 2>
+}
+
+define <8 x i16> @const16_4() alwaysinline {
+entry:
+  ret <8 x i16> <i16 4, i16 4, i16 4, i16 4, i16 4, i16 4, i16 4, i16 4>
+}
+
+define <4 x i32> @himask_2() alwaysinline {
+entry:
+  ret <4 x i32> <i32 -1431655766, i32 -1431655766,
+                 i32 -1431655766, i32 -1431655766>
+}
+
+define <4 x i32> @himask_4() alwaysinline {
+entry:
+  ret <4 x i32> <i32 -858993460, i32 -858993460,
+                 i32 -858993460, i32 -858993460>
+}
+
+define <4 x i32> @himask_8() alwaysinline {
+entry:
+  ret <4 x i32> <i32 -252645136, i32 -252645136,
+                 i32 -252645136, i32 -252645136>
+}
+
+define void @s2p_bytepack_ir(<4 x i32> %s0, <4 x i32> %s1, <4 x i32> %s2,
+  <4 x i32> %s3, <4 x i32> %s4, <4 x i32> %s5, <4 x i32> %s6,
+  <4 x i32> %s7, <4 x i32>* %p0, <4 x i32>* %p1, <4 x i32>* %p2,
+  <4 x i32>* %p3, <4 x i32>* %p4, <4 x i32>* %p5, <4 x i32>* %p6,
+  <4 x i32>* %p7) {
+entry:
+  %bit00224466_0 = alloca <4 x i32>, align 16
+  %bit00224466_1 = alloca <4 x i32>, align 16
+  %bit00224466_2 = alloca <4 x i32>, align 16
+  %bit00224466_3 = alloca <4 x i32>, align 16
+  %bit11335577_0 = alloca <4 x i32>, align 16
+  %bit11335577_1 = alloca <4 x i32>, align 16
+  %bit11335577_2 = alloca <4 x i32>, align 16
+  %bit11335577_3 = alloca <4 x i32>, align 16
+  %bit00004444_0 = alloca <4 x i32>, align 16
+  %bit22226666_0 = alloca <4 x i32>, align 16
+  %bit00004444_1 = alloca <4 x i32>, align 16
+  %bit22226666_1 = alloca <4 x i32>, align 16
+  %bit11115555_0 = alloca <4 x i32>, align 16
+  %bit33337777_0 = alloca <4 x i32>, align 16
+  %bit11115555_1 = alloca <4 x i32>, align 16
+  %bit33337777_1 = alloca <4 x i32>, align 16
+
+  %call10 = call <4 x i32> @himask_2()
+  %call11 = call <8 x i16> @const16_1()
+  call void @s2p_step_ir(<4 x i32> %s0, <4 x i32> %s1,
+  <4 x i32> %call10,
+  <8 x i16> %call11, <4 x i32>* %bit00224466_0,
+  <4 x i32>* %bit11335577_0)
+  %call14 = call <4 x i32> @himask_2()
+  %call15 = call <8 x i16> @const16_1()
+  call void @s2p_step_ir(<4 x i32> %s2, <4 x i32> %s3,
+  <4 x i32> %call14,
+  <8 x i16> %call15, <4 x i32>* %bit00224466_1,
+  <4 x i32>* %bit11335577_1)
+  %call18 = call <4 x i32> @himask_2()
+  %call19 = call <8 x i16> @const16_1()
+  call void @s2p_step_ir(<4 x i32> %s4, <4 x i32> %s5,
+  <4 x i32> %call18,
+  <8 x i16> %call19, <4 x i32>* %bit00224466_2,
+  <4 x i32>* %bit11335577_2)
+  %call22 = call <4 x i32> @himask_2()
+  %call23 = call <8 x i16> @const16_1()
+  call void @s2p_step_ir(<4 x i32> %s6, <4 x i32> %s7,
+  <4 x i32> %call22,
+  <8 x i16> %call23, <4 x i32>* %bit00224466_3,
+  <4 x i32>* %bit11335577_3)
+  %p23 = load <4 x i32>* %bit00224466_0, align 16
+  %p24 = load <4 x i32>* %bit00224466_1, align 16
+  %call24 = call <4 x i32> @himask_4()
+  %call25 = call <8 x i16> @const16_2()
+  call void @s2p_step_ir(<4 x i32> %p23, <4 x i32> %p24,
+  <4 x i32> %call24,
+  <8 x i16> %call25, <4 x i32>* %bit00004444_0,
+  <4 x i32>* %bit22226666_0)
+  %p25 = load <4 x i32>* %bit00224466_2, align 16
+  %p26 = load <4 x i32>* %bit00224466_3, align 16
+  %call26 = call <4 x i32> @himask_4()
+  %call27 = call <8 x i16> @const16_2()
+  call void @s2p_step_ir(<4 x i32> %p25, <4 x i32> %p26,
+  <4 x i32> %call26,
+  <8 x i16> %call27, <4 x i32>* %bit00004444_1,
+  <4 x i32>* %bit22226666_1)
+  %p27 = load <4 x i32>* %bit11335577_0, align 16
+  %p28 = load <4 x i32>* %bit11335577_1, align 16
+  %call28 = call <4 x i32> @himask_4()
+  %call29 = call <8 x i16> @const16_2()
+  call void @s2p_step_ir(<4 x i32> %p27, <4 x i32> %p28,
+  <4 x i32> %call28,
+  <8 x i16> %call29, <4 x i32>* %bit11115555_0,
+  <4 x i32>* %bit33337777_0)
+  %p29 = load <4 x i32>* %bit11335577_2, align 16
+  %p30 = load <4 x i32>* %bit11335577_3, align 16
+  %call30 = call <4 x i32> @himask_4()
+  %call31 = call <8 x i16> @const16_2()
+  call void @s2p_step_ir(<4 x i32> %p29, <4 x i32> %p30,
+  <4 x i32> %call30,
+  <8 x i16> %call31, <4 x i32>* %bit11115555_1,
+  <4 x i32>* %bit33337777_1)
+
+  %p31 = load <4 x i32>* %bit00004444_0, align 16
+  %p32 = load <4 x i32>* %bit00004444_1, align 16
+  %call32 = call <4 x i32> @himask_8()
+  %call33 = call <8 x i16> @const16_4()
+  call void @s2p_step_ir(<4 x i32> %p31, <4 x i32> %p32,
+  <4 x i32> %call32,
+  <8 x i16> %call33, <4 x i32>* %p0, <4 x i32>* %p4)
+  %p33 = load <4 x i32>* %bit11115555_0, align 16
+  %p34 = load <4 x i32>* %bit11115555_1, align 16
+  %call36 = call <4 x i32> @himask_8()
+  %call37 = call <8 x i16> @const16_4()
+  call void @s2p_step_ir(<4 x i32> %p33, <4 x i32> %p34,
+  <4 x i32> %call36,
+  <8 x i16> %call37, <4 x i32>* %p1, <4 x i32>* %p5)
+  %p35 = load <4 x i32>* %bit22226666_0, align 16
+  %p36 = load <4 x i32>* %bit22226666_1, align 16
+  %call40 = call <4 x i32> @himask_8()
+  %call41 = call <8 x i16> @const16_4()
+  call void @s2p_step_ir(<4 x i32> %p35, <4 x i32> %p36,
+  <4 x i32> %call40,
+  <8 x i16> %call41, <4 x i32>* %p2, <4 x i32>* %p6)
+  %p37 = load <4 x i32>* %bit33337777_0, align 16
+  %p38 = load <4 x i32>* %bit33337777_1, align 16
+  %call44 = call <4 x i32> @himask_8()
+  %call45 = call <8 x i16> @const16_4()
+  call void @s2p_step_ir(<4 x i32> %p37, <4 x i32> %p38,
+  <4 x i32> %call44,
+  <8 x i16> %call45, <4 x i32>* %p3, <4 x i32>* %p7)
+
+  ret void
+}
+
+\end{lstlisting}
+
+\section{Transposition With Ideal 3-Stage Algorithm}
+\label{appone:transposition_ideal}
+\begin{lstlisting}
+define <4 x i32> @packh_8(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <32 x i4>
+  %bb = bitcast <4 x i32> %b to <32 x i4>
+  %rr = shufflevector <32 x i4> %bb, <32 x i4> %aa, <32 x i32>
+   <i32 1, i32 3, i32 5, i32 7,  i32 9,  i32 11,  i32 13,  i32 15,
+   i32 17,  i32 19,  i32 21,  i32 23,  i32 25,  i32 27,  i32 29,
+   i32 31,  i32 33,  i32 35,  i32 37,  i32 39,  i32 41,  i32 43,
+   i32 45,  i32 47,  i32 49,  i32 51,  i32 53,  i32 55,  i32 57,
+   i32 59,  i32 61,  i32 63>
+
+  %rr1 = bitcast <32 x i4> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @packl_8(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <32 x i4>
+  %bb = bitcast <4 x i32> %b to <32 x i4>
+  %rr = shufflevector <32 x i4> %bb, <32 x i4> %aa, <32 x i32>
+   <i32 0,  i32 2,  i32 4,  i32 6,  i32 8,  i32 10,  i32 12,  i32 14,
+   i32 16,  i32 18,  i32 20,  i32 22,  i32 24,  i32 26,  i32 28,
+   i32 30,  i32 32,  i32 34,  i32 36,  i32 38,  i32 40,  i32 42,
+   i32 44,  i32 46,  i32 48,  i32 50,  i32 52,  i32 54,  i32 56,
+   i32 58,  i32 60,  i32 62>
+
+  %rr1 = bitcast <32 x i4> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @packh_4(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <64 x i2>
+  %bb = bitcast <4 x i32> %b to <64 x i2>
+  %rr = shufflevector <64 x i2> %bb, <64 x i2> %aa, <64 x i32> <i32 1,
+   i32 3,  i32 5,  i32 7,  i32 9,  i32 11,  i32 13,  i32 15,  i32 17,
+   i32 19,  i32 21,  i32 23,  i32 25,  i32 27,  i32 29,  i32 31,
+   i32 33,  i32 35,  i32 37,  i32 39,  i32 41,  i32 43,  i32 45,
+   i32 47,  i32 49,  i32 51,  i32 53,  i32 55,  i32 57,  i32 59,
+   i32 61,  i32 63,  i32 65,  i32 67,  i32 69,  i32 71,  i32 73,
+   i32 75,  i32 77,  i32 79,  i32 81,  i32 83,  i32 85,  i32 87,
+   i32 89,  i32 91,  i32 93,  i32 95,  i32 97,  i32 99,  i32 101,
+   i32 103,  i32 105,  i32 107,  i32 109,  i32 111,  i32 113,
+   i32 115,  i32 117,  i32 119,  i32 121,  i32 123,  i32 125,  i32 127>
+
+  %rr1 = bitcast <64 x i2> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @packl_4(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <64 x i2>
+  %bb = bitcast <4 x i32> %b to <64 x i2>
+  %rr = shufflevector <64 x i2> %bb, <64 x i2> %aa, <64 x i32>
+   <i32 0,  i32 2,  i32 4,  i32 6,  i32 8,  i32 10,  i32 12,  i32 14,
+   i32 16,  i32 18,  i32 20,  i32 22,  i32 24,  i32 26,  i32 28,
+   i32 30,  i32 32,  i32 34,  i32 36,  i32 38,  i32 40,  i32 42,
+   i32 44,  i32 46,  i32 48,  i32 50,  i32 52,  i32 54,  i32 56,
+   i32 58,  i32 60,  i32 62,  i32 64,  i32 66,  i32 68,  i32 70,
+   i32 72,  i32 74,  i32 76,  i32 78,  i32 80,  i32 82,  i32 84,
+   i32 86,  i32 88,  i32 90,  i32 92,  i32 94,  i32 96,  i32 98,
+   i32 100,  i32 102,  i32 104,  i32 106,  i32 108,  i32 110,
+   i32 112,  i32 114,  i32 116,  i32 118,  i32 120,  i32 122,
+   i32 124,  i32 126>
+
+  %rr1 = bitcast <64 x i2> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @packh_2(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <128 x i1>
+  %bb = bitcast <4 x i32> %b to <128 x i1>
+  %rr = shufflevector <128 x i1> %bb, <128 x i1> %aa, <128 x i32>
+   <i32 1,  i32 3,  i32 5,  i32 7,  i32 9,  i32 11,  i32 13,  i32 15,
+   i32 17,  i32 19,  i32 21,  i32 23,  i32 25,  i32 27,  i32 29,  i32
+   31,  i32 33,  i32 35,  i32 37,  i32 39,  i32 41,  i32 43,  i32 45,
+   i32 47,  i32 49,  i32 51,  i32 53,  i32 55,  i32 57,  i32 59,  i32
+   61,  i32 63,  i32 65,  i32 67,  i32 69,  i32 71,  i32 73,  i32 75,
+   i32 77,  i32 79,  i32 81,  i32 83,  i32 85,  i32 87,  i32 89,  i32
+   91,  i32 93,  i32 95,  i32 97,  i32 99,  i32 101,  i32 103,  i32
+   105,  i32 107,  i32 109,  i32 111,  i32 113,  i32 115,  i32 117,
+   i32 119,  i32 121,  i32 123,  i32 125,  i32 127,  i32 129,  i32
+   131,  i32 133,  i32 135,  i32 137,  i32 139,  i32 141,  i32 143,
+   i32 145,  i32 147,  i32 149,  i32 151,  i32 153,  i32 155,  i32
+   157,  i32 159,  i32 161,  i32 163,  i32 165,  i32 167,  i32 169,
+   i32 171,  i32 173,  i32 175,  i32 177,  i32 179,  i32 181,  i32
+   183,  i32 185,  i32 187,  i32 189,  i32 191,  i32 193,  i32 195,
+   i32 197,  i32 199,  i32 201,  i32 203,  i32 205,  i32 207,  i32
+   209,  i32 211,  i32 213,  i32 215,  i32 217,  i32 219,  i32 221,
+   i32 223,  i32 225,  i32 227,  i32 229,  i32 231,  i32 233,  i32
+   235,  i32 237,  i32 239,  i32 241,  i32 243,  i32 245,  i32 247,
+   i32 249,  i32 251,  i32 253,  i32 255>
+
+  %rr1 = bitcast <128 x i1> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define <4 x i32> @packl_2(<4 x i32> %a, <4 x i32> %b) alwaysinline {
+entry:
+  %aa = bitcast <4 x i32> %a to <128 x i1>
+  %bb = bitcast <4 x i32> %b to <128 x i1>
+  %rr = shufflevector <128 x i1> %bb, <128 x i1> %aa, <128 x i32>
+        <i32 0,  i32 2,  i32 4,  i32 6,  i32 8,  i32 10,  i32 12,  i32
+        14,  i32 16,  i32 18,  i32 20,  i32 22,  i32 24,  i32 26,  i32
+        28,  i32 30,  i32 32,  i32 34,  i32 36,  i32 38,  i32 40,  i32
+        42,  i32 44,  i32 46,  i32 48,  i32 50,  i32 52,  i32 54,  i32
+        56,  i32 58,  i32 60,  i32 62,  i32 64,  i32 66,  i32 68,  i32
+        70,  i32 72,  i32 74,  i32 76,  i32 78,  i32 80,  i32 82,  i32
+        84,  i32 86,  i32 88,  i32 90,  i32 92,  i32 94,  i32 96,  i32
+        98,  i32 100,  i32 102,  i32 104,  i32 106,  i32 108,  i32
+        110,  i32 112,  i32 114,  i32 116,  i32 118,  i32 120,  i32
+        122,  i32 124,  i32 126,  i32 128,  i32 130,  i32 132,  i32
+        134,  i32 136,  i32 138,  i32 140,  i32 142,  i32 144,  i32
+        146,  i32 148,  i32 150,  i32 152,  i32 154,  i32 156,  i32
+        158,  i32 160,  i32 162,  i32 164,  i32 166,  i32 168,  i32
+        170,  i32 172,  i32 174,  i32 176,  i32 178,  i32 180,  i32
+        182,  i32 184,  i32 186,  i32 188,  i32 190,  i32 192,  i32
+        194,  i32 196,  i32 198,  i32 200,  i32 202,  i32 204,  i32
+        206,  i32 208,  i32 210,  i32 212,  i32 214,  i32 216,  i32
+        218,  i32 220,  i32 222,  i32 224,  i32 226,  i32 228,  i32
+        230,  i32 232,  i32 234,  i32 236,  i32 238,  i32 240,  i32
+        242,  i32 244,  i32 246,  i32 248,  i32 250,  i32 252,  i32
+        254>
+
+  %rr1 = bitcast <128 x i1> %rr to <4 x i32>
+  ret <4 x i32> %rr1
+}
+
+define void @s2p_ideal_ir(<4 x i32> %s0, <4 x i32> %s1, <4 x i32> %s2,
+                          <4 x i32> %s3,
+                          <4 x i32> %s4, <4 x i32> %s5, <4 x i32> %s6,
+                          <4 x i32> %s7,
+                          <4 x i32>* %p0, <4 x i32>* %p1,
+                          <4 x i32>* %p2, <4 x i32>* %p3,
+                          <4 x i32>* %p4, <4 x i32>* %p5,
+                          <4 x i32>* %p6, <4 x i32>* %p7) {
+entry:
+
+  %bit0123_0 = call <4 x i32> @packh_8(<4 x i32> %s0, <4 x i32> %s1)
+  %bit0123_1 = call <4 x i32> @packh_8(<4 x i32> %s2, <4 x i32> %s3)
+  %bit0123_2 = call <4 x i32> @packh_8(<4 x i32> %s4, <4 x i32> %s5)
+  %bit0123_3 = call <4 x i32> @packh_8(<4 x i32> %s6, <4 x i32> %s7)
+  %bit4567_0 = call <4 x i32> @packl_8(<4 x i32> %s0, <4 x i32> %s1)
+  %bit4567_1 = call <4 x i32> @packl_8(<4 x i32> %s2, <4 x i32> %s3)
+  %bit4567_2 = call <4 x i32> @packl_8(<4 x i32> %s4, <4 x i32> %s5)
+  %bit4567_3 = call <4 x i32> @packl_8(<4 x i32> %s6, <4 x i32> %s7)
+
+  %bit01_0 = call <4 x i32> @packh_4(<4 x i32> %bit0123_0,
+  <4 x i32> %bit0123_1)
+  %bit01_1 = call <4 x i32> @packh_4(<4 x i32> %bit0123_2, <4 x i32>
+  %bit0123_3)
+  %bit23_0 = call <4 x i32> @packl_4(<4 x i32> %bit0123_0, <4 x i32>
+  %bit0123_1)
+  %bit23_1 = call <4 x i32> @packl_4(<4 x i32> %bit0123_2, <4 x i32>
+  %bit0123_3)
+  %bit45_0 = call <4 x i32> @packh_4(<4 x i32> %bit4567_0, <4 x i32>
+  %bit4567_1)
+  %bit45_1 = call <4 x i32> @packh_4(<4 x i32> %bit4567_2, <4 x i32>
+  %bit4567_3)
+  %bit67_0 = call <4 x i32> @packl_4(<4 x i32> %bit4567_0, <4 x i32>
+  %bit4567_1)
+  %bit67_1 = call <4 x i32> @packl_4(<4 x i32> %bit4567_2, <4 x i32>
+  %bit4567_3)
+
+  %pp0 = call <4 x i32> @packh_2(<4 x i32> %bit01_0, <4 x i32> %bit01_1)
+  %pp1 = call <4 x i32> @packl_2(<4 x i32> %bit01_0, <4 x i32> %bit01_1)
+  %pp2 = call <4 x i32> @packh_2(<4 x i32> %bit23_0, <4 x i32> %bit23_1)
+  %pp3 = call <4 x i32> @packl_2(<4 x i32> %bit23_0, <4 x i32> %bit23_1)
+  %pp4 = call <4 x i32> @packh_2(<4 x i32> %bit45_0, <4 x i32> %bit45_1)
+  %pp5 = call <4 x i32> @packl_2(<4 x i32> %bit45_0, <4 x i32> %bit45_1)
+  %pp6 = call <4 x i32> @packh_2(<4 x i32> %bit67_0, <4 x i32> %bit67_1)
+  %pp7 = call <4 x i32> @packl_2(<4 x i32> %bit67_0, <4 x i32> %bit67_1)
+
+  store <4 x i32> %pp0, <4 x i32>* %p0
+  store <4 x i32> %pp1, <4 x i32>* %p1
+  store <4 x i32> %pp2, <4 x i32>* %p2
+  store <4 x i32> %pp3, <4 x i32>* %p3
+  store <4 x i32> %pp4, <4 x i32>* %p4
+  store <4 x i32> %pp5, <4 x i32>* %p5
+  store <4 x i32> %pp6, <4 x i32>* %p6
+  store <4 x i32> %pp7, <4 x i32>* %p7
+
+  ret void
+}
+\end{lstlisting}
