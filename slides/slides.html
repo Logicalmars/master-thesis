@@ -56,12 +56,144 @@ layout: false
 
 # Introduction
 
-.center[
-<img src = "../draw/system.png" style="width: 80%;" />
-]
+* Parabix technology uses SIMD instructions for parallel text processing.
+--
+
+
+* SIMD is not easy to program:
+--
+
+  1. SIMD instructions varies greatly from different ISA.
+
+  2. SIMD instructions are sparse: most operations are only available for some pre-chosen data size.
+--
+
+* So an uniform SIMD programming model is necessary.
+
+---
+
+# Introduction
+
+* Inductive Doubling Instruction Set Architecture
+
+  1. Simple, systematic model with uniform API for SIMD operations.
+
+  2. Supports all power-of-2 field width.
+
+  3. Cross platform. (Intel SSE, AVX. ARM NEON.)
+
+  3. C++ library with templates.
+```cpp
+    SIMD_type a = simd<8>::constant<3>();
+    SIMD_type b = simd<8>::srli<1>(a);
+    SIMD_type c = simd<4>::add(a, b);
+    SIMD_type d = hsimd<16>::packh(a, b);
+```
+---
+name: idisa-limit
+
+#Introduction
+
+* But IDISA has limitations:
+
+  1. Requires different header files for different platform. Target specific.
+
+<hr/>
+
+---
+template: idisa-limit
+
+  * ARM NEON
+```cpp
+#include "arm_neon.h"
+bitblock128_t simd<8>::add(bitblock128_t arg1, bitblock128_t arg2)
+{
+      return (bitblock128_t)vaddq_u8((uint8x16_t)(arg1), (uint8x16_t)(arg2));
+}
+```
+  * Intel SSE2
+```cpp
+#include "emmintrin.h"
+bitblock128_t simd<8>::add(bitblock128_t arg1, bitblock128_t arg2)
+{
+      return _mm_add_epi8(arg1, arg2);
+}
+```
+
+---
+template: idisa-limit
+
+  * The knowledge of which operations are supported
+
+  * If not supported, find the best strategy to implement it. (Also relates to the target)
+--
+
+    - Intel SSE2
+```cpp
+bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
+{
+          return _mm_max_epu8(arg1, arg2);
+}
+```
+
+
+---
+template: idisa-limit
+
+  * The knowledge of which operations are supported
+
+  * If not supported, find the best strategy to implement it. (Also relates to the target)
+
+    - ARM NEON
+```cpp
+bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
+{
+          bitblock128_t high_bit = simd128<8>::constant<(128)>();
+          return simd_xor(simd128<8>::max(simd_xor(arg1, high_bit),
+                          simd_xor(arg2, high_bit)), high_bit);
+}
+```
+
+---
+
+#Introduction
+
+* But IDISA has limitations:
+
+  1. Requires different header files for different platform. Target specific.
+
+  2. Optimization scope is limited to one function.
+--
+    *Lose function context*
+--
+
+* So we want a new back end.
+
+---
+
+#Introduction
+
+* LLVM is the currently most promising back end.
+--
+
+    - Target-independent intermediate representation (IR)
+
+        + A vector-of-integer type system
+        + `<2 x i64>`, `<32 x i4>`, ...
+        + `%sum = add <2 x i64> %a, %b`
+--
+
+    - Inter-procedural, whole program analysis and optimization.
+--
+    - Just-in-time compilation.
+
+
 
     </textarea>
-    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript">
+    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript"></script>
+    <script src="http://www.livejs.com/live.js" type="text/javascript" charset="utf-8"></script>
+    <script type="text/javascript" charset="utf-8">
+
     </script>
     <script type="text/javascript">
       var slideshow = remark.create();
