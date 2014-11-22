@@ -14,6 +14,15 @@
         font-weight: normal;
       }
       .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      .red {
+        color: red;
+      }
+      .green{
+        color: green;
+      }
+      .yellow{
+        color: rgb(245, 178, 33);
+      }
     </style>
   </head>
   <body>
@@ -57,24 +66,59 @@ layout: false
 # Introduction
 
 * Parabix technology uses SIMD instructions for parallel text processing.
+
+* XML parsing
+
+* UTF-8 to UTF-16 transcoder
+
+* Regular expression matching
+
+---
+
+#Introduction
+
+* LLVM is a widely-used compiler infrastructure:
 --
 
+    - Target-independent intermediate representation (IR)
 
-* SIMD is not easy to program:
+        + A vector-of-integer type system that fits SIMD properly
+        + `<2 x i64>`, `<32 x i4>`, ...
+        + `%sum = add <2 x i64> %a, %b`
 --
 
-  1. SIMD instructions varies greatly from different ISA.
-
-  2. SIMD instructions are sparse: most operations are only available for some pre-chosen data size.
+    - Inter-procedural, whole program analysis and optimization.
+        + Analysis with different level of context
+        + Basic block, function, module, link time
 --
 
-* So an uniform SIMD programming model is necessary.
+    - Just-in-time compilation.
+        + Generate IR on the fly
+        + Good for regular expression matching
+---
+
+class: center, middle
+##Can we use LLVM to support all the SIMD processing requirements of Parabix?
+
+???
+
+If we can, we bring all the benefit of LLVM into Parabix.
+---
+#Yes!
+
+We demonstrate in two steps:
+
+* _Step 1_: All the IDISA operations can be re-written in IR
+
+* _Step 2_: LLVM back end can be extended to generate efficient machine code
 
 ---
 
 # Introduction
 
-* Inductive Doubling Instruction Set Architecture
+* IDISA: Inductive Doubling Instruction Set Architecture
+
+  0. Current SIMD support of Parabix.
 
   1. Simple, systematic model with uniform API for SIMD operations.
 
@@ -89,14 +133,142 @@ layout: false
     SIMD_type c = simd<4>::add(a, b);
     SIMD_type d = hsimd<16>::packh(a, b);
 ```
+
+---
+# Introduction
+
+* IDISA defines five categories of operations.
+
+* These operations are the SIMD processing requirements of Parabix
+
+* LLVM IR can support all of them
+
+---
+
+## IDISA Vertical Operation
+
+* Add, sub, multiplication
+```cpp
+define <16 x i8> @simd_add_8(<16 x i8> %arg1, <16 x i8> %arg2) {
+entry:
+      %r = add <16 x i8> %arg1, %arg2
+      ret <16 x i8> %r
+}
+```
+--
+
+* Integer comparison
+```cpp
+define <16 x i8> @simd_eq_8(<16 x i8> %arg1, <16 x i8> %arg2) {
+entry:
+      %r1 = icmp eq <16 x i8> %arg1, %arg2
+      %r2 = sext <16 x i1> %r1 to <16 x i8>
+      ret <16 x i8> %r2
+}
+```
+---
+
+##IDISA Horizontal Operation
+
+* Use powerful *shuffle_vector* and *bitcast*
+
+--
+
+* Packing high
+
+.center[
+<img src = "../draw/packh_16.png" style="width: 80%;" />
+]
+
+```cpp
+define <8 x i16> @hsimd_packh_32(<4 x i32> %a, <4 x i32> %b) {
+entry:
+      %aa = bitcast <4 x i32> %a to <8 x i16>
+      %bb = bitcast <4 x i32> %b to <8 x i16>
+      %rr = shufflevector <8 x i16> %bb, <8 x i16> %aa, <8 x i32> <i32 1, i32 3,
+                          i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+      ret <8 x i16> %rr
+}
+```
+---
+
+##IDISA Horizontal Operation
+
+* Packing low: change the mask to 0, 2, 4, 6, ..., 14
+
+* Packing sign mask
+```cpp
+      // signed less than zero
+      // yield <4 x i1> sign mask
+      icmp slt <4 x i32> %a, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
+```
+
+* Other operations
+
+---
+
+##IDISA Expansion Operation
+* Merging high
+
+.center[
+<img src = "../draw/mergeh_16.png"/>
+]
+
+```cpp
+define <4 x i32> @esimd_mergeh_16(<8 x i16> %a, <8 x i16> %b) {
+entry:
+      %rr = shufflevector <8 x i16> %b, <8 x i16> %a, <8 x i32> <i32 4, i32 12,
+                          i32 5, i32 13, i32 6, i32 14, i32 7, i32 15>
+      %rr1 = bitcast <8 x i16> %rr to <4 x i32>
+      ret <4 x i32> %rr1
+}
+```
+---
+
+## Field Movement Operation
+
+* Field extraction or insertion:
+```cpp
+    // yields <ty>
+    <result> = extractelement <n x <ty>> <val>, <ty2> <idx>
+
+    // yields <n x <ty>>
+    <result> = insertelement <n x <ty>> <val>, <ty> <elt>, <ty2> <idx>
+```
+
+* Constant fill:
+```cpp
+    <4 x i32> <i32 1, i32 10, i32 30, i32 99>
+```
+
+* Field shuffle: *shufflevector*
+---
+
+## Full Register Operation
+
+* Write in large-size integer
+    - `i128`, `i256`
+
+* All the integer operations LLVM support can be applied.
+    - add / sub / multiply
+    - shifting
+    - llvm.uadd.with.overflow
+```cpp
+      declare {i128, i1} @llvm.uadd.with.overflow.i128(i128 %a, i128 %b)
+      declare {i256, i1} @llvm.uadd.with.overflow.i256(i256 %a, i256 %b)
+```
+
+???
+
+Now all the five categories of operations are supported.
+
 ---
 name: idisa-limit
 
-#Introduction
+#Comparison between IR and IDISA
 
-* But IDISA has limitations:
-
-  1. Requires different header files for different platform. Target specific.
+* IR specifies no target information.
+* IDISA requires different header files for different platform.
 
 <hr/>
 
@@ -121,12 +293,14 @@ bitblock128_t simd<8>::add(bitblock128_t arg1, bitblock128_t arg2)
 ```
 
 ---
+name: t1
 template: idisa-limit
 
-  * The knowledge of which operations are supported
+  * Best implementation strategies are target specific.
 
-  * If not supported, find the best strategy to implement it. (Also relates to the target)
---
+  * The knowledge of which operations are supported.
+---
+template: t1
 
     - Intel SSE2
 ```cpp
@@ -136,15 +310,10 @@ bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
 }
 ```
 
-
 ---
-template: idisa-limit
+template: t1
 
-  * The knowledge of which operations are supported
-
-  * If not supported, find the best strategy to implement it. (Also relates to the target)
-
-    - ARM NEON
+    * ARM NEON
 ```cpp
 bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
 {
@@ -156,42 +325,246 @@ bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
 
 ---
 
-#Introduction
+layout: true
 
-* But IDISA has limitations:
+#Comparison between IR and IDISA
 
-  1. Requires different header files for different platform. Target specific.
+* IR tells what to implement.
+* IDISA tells how to implement.
 
-  2. Optimization scope is limited to one function.
---
-    *Lose function context*
---
+<hr/>
 
-* So we want a new back end.
+  * IR
+```cpp
+      add <32 x i4> %a, %b
+```
 
 ---
 
-#Introduction
+---
 
-* LLVM is the currently most promising back end.
+  * IDISA for SSE2
+```cpp
+      simd<1>::ifh(simd<(8)>::himask(),
+                   simd<(8)>::add(arg1, simd_and(simd<(8)>::himask(), arg2)),
+                   simd<(8)>::add(arg1, arg2))
+```
+
+---
+  * IDISA `simd<4>::add` compiled to IR:
+```cpp
+      %and.i.i.i = and <2 x i64> %b, %m0
+      %0 = bitcast <2 x i64> %a to <16 x i8>
+      %1 = bitcast <2 x i64> %and.i.i.i to <16 x i8>
+      %add.i.i10.i = add <16 x i8> %0, %1
+      %2 = bitcast <16 x i8> %add.i.i10.i to <2 x i64>
+      %3 = bitcast <2 x i64> %b to <16 x i8>
+      %add.i.i.i = add <16 x i8> %0, %3
+      %4 = bitcast <16 x i8> %add.i.i.i to <2 x i64>
+      %and.i.i.i.i = and <2 x i64> %2, %m0
+      %and.i.i7.i.i = and <2 x i64> %4, %m1
+      %or.i.i.i.i = or <2 x i64> %and.i.i.i.i, %and.i.i7.i.i
+      ret <2 x i64> %or.i.i.i.i
+```
+
+---
+layout: false
+
+#Comparison between IR and IDISA
+
+* IR handles illegal operations in the back end
+* IDISA inline-extend illegal operations in the front end
+
+<hr/>
+
 --
 
-    - Target-independent intermediate representation (IR)
+* IDISA loses operation semantic immediately.
 
-        + A vector-of-integer type system
-        + `<2 x i64>`, `<32 x i4>`, ...
-        + `%sum = add <2 x i64> %a, %b`
+* Late extension enables more front end optimization; e.g. constant folding
+```cpp
+%c = xor <4 x i32> %c, %c
+%a = add <32 x i4> %a, %c
+```
+The addition can be optimized away.
 --
 
-    - Inter-procedural, whole program analysis and optimization.
+* Simplify peephole optimizations, because the patterns are easier to recognize
+```cpp
+%a = shl i128 %A, 1
+%b = lshr i128 %B, 127
+%r = or i128 %a, %b
+```
+Recognized as long stream shifting.
+---
+
+#Support Parabix with LLVM
+
+We demonstrate in two steps:
+
+.green[
+* _Step 1_: All the IDISA operations can be re-written in IR &#10004;
+]
+
+* _Step 2_: LLVM back end can be extended to generate efficient machine code
+
+---
+
+## Efficient Code Generation
+
+* The performance of the LLVM back end should be at least as good as IDISA.
+
 --
-    - Just-in-time compilation.
 
+* Current LLVM does not generate good machine code.
+  - Small-element vectors
+      - i1, i2, i4
+  - Shufflevector for critical Pararbix operation
+      - packing, merging
+  - Long integer addition / shifting
+      - add / shift i128, i256
 
+--
+
+* LLVM needs to be extended.
+---
+layout: true
+## Vector of Small Element
+
+---
+* LLVM default: promote element strategy.
+
+  <img src="../draw/v32i1_legalize_type.png" />
+--
+
+* `v32i1` fits in general 32-bit register.
+
+* Bitcasting `v32i1` to `i32` generates better code.
+---
+
+* _LLVM legality_:
+  - An operation is legal if it is supported by the target machine.
+
+  - Unsupported types are illegal types.
+
+* _Redefined legality_:
+  - A vector type is legal if it has the same size in bits with one of the target's registers.
+
+  - `v32i1`, `v64i1`, `v32i4`
+
+--
+
+* Operations on these newly-legalized types need to be handled.
+.center[
+  `add <32 x i1> %a, %b`
+
+  &#8681;
+
+  `xor i32 %a, %b`
+]
+
+---
+layout: false
+## In-place Lowering Overview
+
+* LLVM default legalize process  VS  In-place lowering
+
+<img src="../draw/v32i1_compare.png" style="width: 100%;"/>
+---
+
+## In-place Lowering
+
+* `i2` vectors
+
+    - Circuit Minimization Problem
+
+* `i4` vectors
+
+    - Inductive Doubling Principle
+---
+### Inductive Doubling Principle
+
+<img src="../draw/add_4.png" style="width: 90%;"/>
+---
+## Extend LLVM
+
+<img src="../draw/system.png" style="width: 90%;"/>
+---
+
+#Support Parabix with LLVM
+
+We demonstrate in two steps:
+
+.green[
+* _Step 1_: All the IDISA operations can be re-written in IR &#10004;
+]
+
+.yellow[
+* _Step 2_: LLVM back end can be extended to generate efficient machine code
+]
+---
+layout: true
+# Performance
+
+---
+
+* Micro benchmark on `i1`, `i2`, `i4` vector operations
+
+  - Similar performance with IDISA
+
+  - Much better than the unmodified LLVM (in relative CPU cycles)
+
+      <img src="../draw/micro_bench_unmodified.png" />
+---
+* XML well-formedness check (xmlwf) with IR transposition.
+      <img src="../draw/benchmark_xmlwf.png" alt="" style="width: 90%;"/>
+---
+* Long stream addition with regular expression matching
+      <img src="../draw/inst_count_long_add.png" alt="" style="width: 90%;"/>
+---
+* Long stream shifting with regular expression matching
+      <img src="../draw/inst_count_long_shift.png" alt="" style="width: 90%;"/>
+---
+* Long stream addition / shifting together with 256-bit SIMD registers
+      <img src="../draw/inst_count_all_256.png" alt="" style="width: 90%;"/>
+---
+layout: false
+## Scalability
+
+* Long stream addition / shifting all together
+* Relative instruction count on 256-bit SIMD registers versus 128-bit registers
+      <img src="../draw/inst_count_scalability.png" style="width: 90%;" alt=""/>
+---
+## Add with carry code for unmodified LLVM
+```cpp
+declare {i128, i1} @llvm.uadd.with.overflow.i128(i128 %a, i128 %b)
+;return a pair of sum and carry-out bit
+
+{i128, i1} @add_with_carry(i128 %a, i128 %b, i1 %carryin) {
+entry:
+    cin = zext %carryin to i128
+    {s1, c1} = @llvm.uadd.with.overflow.i128(%a, %b)
+    {sum, c2} = @llvm.uadd.with.overflow.i128(s1, cin)
+    cout = or i1 c1, c2
+    ret {sum, cout}
+}
+```
+---
+#Support Parabix with LLVM
+
+We demonstrate in two steps:
+
+.green[
+* _Step 1_: All the IDISA operations can be re-written in IR &#10004;
+]
+
+.green[
+* _Step 2_: LLVM back end can be extended to generate efficient machine code on X86 SSE2 and AVX2 &#10004;
+]
 
     </textarea>
     <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript"></script>
-    <script src="https://s3.amazonaws.com/remoats/scripts/github/remotes.ne.min.js"></script>
+    <!--<script src="https://s3.amazonaws.com/remoats/scripts/github/remotes.ne.min.js"></script>-->
     <script type="text/javascript">
       var slideshow = remark.create();
 
