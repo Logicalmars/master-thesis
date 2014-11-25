@@ -257,9 +257,9 @@ Now all the five categories of operations are supported.
 ---
 name: idisa-limit
 
-#Comparison between IR and IDISA
+#Comparison between the IR library and IDISA
 
-* IR specifies no target information.
+* The IR library specifies no target information.
 * IDISA requires different header files for different platform.
 
 <hr/>
@@ -283,93 +283,20 @@ bitblock128_t simd<8>::add(bitblock128_t arg1, bitblock128_t arg2)
       return _mm_add_epi8(arg1, arg2);
 }
 ```
+---
+#Comparison between the IR library and IDISA
+  <img src="../draw/idisa_library_overview.png" style="width:100%;"/>
 
 ---
-name: t1
-template: idisa-limit
-
-  * Best implementation strategies are target specific.
-
-  * The knowledge of which operations are supported.
----
-template: t1
-
-    - Intel SSE2
-```cpp
-bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
-{
-          return _mm_max_epu8(arg1, arg2);
-}
-```
+#Comparison between the IR library and IDISA
+  <img src="../draw/ir_library_overview.png" style="width:100%;"/>
 
 ---
-template: t1
+#Comparison between the IR library and IDISA
 
-    * ARM NEON
-```cpp
-bitblock128_t simd128<8>::umax(bitblock128_t arg1, bitblock128_t arg2)
-{
-          bitblock128_t high_bit = simd128<8>::constant<(128)>();
-          return simd_xor(simd128<8>::max(simd_xor(arg1, high_bit),
-                          simd_xor(arg2, high_bit)), high_bit);
-}
-```
-
----
-
-layout: true
-
-#Comparison between IR and IDISA
-
-* IR tells what to implement.
-* IDISA tells how to implement.
+* The IR library moves IDISA logic to the back end.
 
 <hr/>
-
-  * IR
-```cpp
-      add <32 x i4> %a, %b
-```
-
----
-
----
-
-  * IDISA for SSE2
-```cpp
-      simd<1>::ifh(simd<(8)>::himask(),
-                   simd<(8)>::add(arg1, simd_and(simd<(8)>::himask(), arg2)),
-                   simd<(8)>::add(arg1, arg2))
-```
-
----
-  * IDISA `simd<4>::add` compiled to IR:
-```cpp
-      %and.i.i.i = and <2 x i64> %b, %m0
-      %0 = bitcast <2 x i64> %a to <16 x i8>
-      %1 = bitcast <2 x i64> %and.i.i.i to <16 x i8>
-      %add.i.i10.i = add <16 x i8> %0, %1
-      %2 = bitcast <16 x i8> %add.i.i10.i to <2 x i64>
-      %3 = bitcast <2 x i64> %b to <16 x i8>
-      %add.i.i.i = add <16 x i8> %0, %3
-      %4 = bitcast <16 x i8> %add.i.i.i to <2 x i64>
-      %and.i.i.i.i = and <2 x i64> %2, %m0
-      %and.i.i7.i.i = and <2 x i64> %4, %m1
-      %or.i.i.i.i = or <2 x i64> %and.i.i.i.i, %and.i.i7.i.i
-      ret <2 x i64> %or.i.i.i.i
-```
-
----
-layout: false
-
-#Comparison between IR and IDISA
-
-* IR handles illegal operations in the back end
-* IDISA inline-extend illegal operations in the front end
-
-<hr/>
-
---
 
 * IDISA loses operation semantic immediately.
 
@@ -427,11 +354,16 @@ layout: true
 * LLVM default: promote element strategy.
 
   <img src="../draw/v32i1_legalize_type.png" />
+---
+
+* LLVM default legalize process  VS  In-place lowering
+
+<img src="../draw/v32i1_compare.png" style="width: 100%;"/>
 --
 
 * `v32i1` fits in general 32-bit register.
 
-* Bitcasting `v32i1` to `i32` generates better code.
+* Handle its operation in-place.
 ---
 
 * _LLVM legality_:
@@ -457,12 +389,6 @@ layout: true
 
 ---
 layout: false
-## In-place Lowering Overview
-
-* LLVM default legalize process  VS  In-place lowering
-
-<img src="../draw/v32i1_compare.png" style="width: 100%;"/>
----
 
 ## In-place Lowering
 
@@ -510,15 +436,24 @@ layout: true
 ---
 * XML well-formedness check (xmlwf) with IR transposition.
       <img src="../draw/benchmark_xmlwf.png" alt="" style="width: 90%;"/>
+
+* xmlwf0 only uses IDISA.
+* xmlwf1 uses IDISA and IR transposition code. On Haswell, VEX instructions can be leveraged for better performance.
 ---
 * Long stream addition with regular expression matching
       <img src="../draw/inst_count_long_add.png" alt="" style="width: 90%;"/>
+
+* Compared with unmodified LLVM on Intel SSE2, around 20% better
 ---
 * Long stream shifting with regular expression matching
       <img src="../draw/inst_count_long_shift.png" alt="" style="width: 90%;"/>
+
+* Compared with unmodified LLVM on Intel SSE2, around 10~20% better
 ---
 * Long stream addition / shifting together with 256-bit SIMD registers
       <img src="../draw/inst_count_all_256.png" alt="" style="width: 90%;"/>
+
+* Compared with unmodified LLVM on Intel Haswell, 30% overall improvement.
 ---
 layout: false
 ## Scalability
@@ -526,6 +461,10 @@ layout: false
 * Long stream addition / shifting all together
 * Relative instruction count on 256-bit SIMD registers versus 128-bit registers
       <img src="../draw/inst_count_scalability.png" style="width: 90%;" alt=""/>
+
+* Unmodified LLVM gains less from hardware improvement.
+* Our LLVM gains 20% more improvement from SSE2 to AVX2.
+
 ---
 ## Add with carry code for unmodified LLVM
 ```cpp
@@ -553,6 +492,12 @@ We demonstrate in two steps:
 .green[
 * _Step 2_: LLVM back end can be extended to generate efficient machine code on X86 SSE2 and AVX2 &#10004;
 ]
+---
+
+class: center, middle
+## We can use LLVM to support all the SIMD processing requirements of Parabix.
+
+## And we can get efficient code generation in X86 targets.
 
     </textarea>
     <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript"></script>
