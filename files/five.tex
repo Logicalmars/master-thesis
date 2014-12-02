@@ -7,14 +7,14 @@
 \chapter{Implementation}
 \label{five}
 
-In this Chapter, we describe our realization of Parabix technology inside LLVM facility. LLVM is a well-structured open source compiler tool chain which is under rapid development. So during our implementation, we tried our best to follow its design principle while keeping our code modularized and isolated to be able to easily integrate with new versions of LLVM\@. Our goal of code design is to:
+In this Chapter, we describe our realization of Parabix technology inside the LLVM facility. LLVM is a well-structured open source compiler tool chain which is under rapid development. So during our implementation, we tried our best to follow its design principles while keeping our code modularized and isolated to be able to easily integrate with new versions of LLVM\@. Our goal of code design is to:
 \begin{enumerate}
   \item Use general strategies across different types and operations to reduce repeated logic.
-  \item Minimize code injection in the existing source and put Parabix logic in the separate module.
-  \item Check correctness of every operation we implement. Since most of the test code follow the same pattern, they should be generated automatically to reduce repeated human work.
+  \item Minimize code injection in the existing source and put Parabix logic in a separate module.
+  \item Check correctness of every operation we implement. Since most of the test code follows the same pattern, they should be generated automatically to reduce repeated human work.
 \end{enumerate}
 
-Most of our code sit in LLVM Target-Independent Code Generator\cite{llvm_code_gen}. From Chapter~\ref{four}, we know that the current type legalization process of LLVM has big performance penalty for small element vectors. So our approach marks $i1$, $i2$ and $i4$ vector legal type first, and then handle them in the operation legalization phase. For convenience, we name this set of vector types \textit{Parabix Vector}.
+Most of our code reside in LLVM Target-Independent Code Generator\cite{llvm_code_gen}. From Chapter~\ref{four}, we know that the current type legalization process of LLVM has a big performance penalty for small element vectors. So our approach marks $i1$, $i2$ and $i4$ vector legal type first, and then handles them in the operation legalization phase. For convenience, we name this set of vector types the \textit{Parabix Vector}.
 
 We walk through the following steps to mark a type legal on a certain target:
 \begin{itemize}
@@ -28,28 +28,28 @@ Now the type legalization phase recognizes our $i1$, $i2$, $i4$ vectors as legal
 \begin{figure}[ht!]
 \centering
 \includegraphics[width=140mm]{draw/system.png}
-\caption[System overview: modified instruction selection process]{Overview of the modified instruction selection process. Logic for Parabix vectors are hooked into two places: the operation legalization phase and DAG Combine Phases.}
+\caption[System overview: modified instruction selection process]{Overview of the modified instruction selection process. Logic for Parabix vectors are hooked into two places: the operation legalization phase and DAG Combine Phases. They are coloured with grey background.}
 \label{figure:system}
 \end{figure}
 
-Figure~\ref{figure:system} gives an overview of our implementation. LLVM constructs a SelectionDAG with the input IR source code and then puts it through DAG Combine 1 for cleaning up and optimization. The optimized DAG is fed into the type legalization phase. We mark the Parabix Vectors type-legal so that they could pass through this phase without being changed. There is another DAG combining phase after the type legalization. Then, the result DAG is fed into the operation legalization phase which is done by iteration. Custom Lowering for Parabix resides in this phase. In each iteration, the legalizer checks every DAG node for its legality. If the node is illegal and performs operation on some Parabix vector, the Parabix Custom Lowering code will be called to legalize this node; otherwise the default LLVM logic will handle this illegal node. The iteration terminates when every DAG node is legal. By iteration, the legalizer could introduce new illegal nodes into the graph.
+Figure~\ref{figure:system} gives an overview of our implementation. LLVM constructs a SelectionDAG with the input IR source code and then puts it through DAG Combine 1 for cleaning up and optimization. The optimized DAG is fed into the type legalization phase. We mark the Parabix Vectors type-legal so that they could pass through this phase without being changed. There is another DAG combining phase after the type legalization. Then, the resulting DAG is fed into the operation legalization phase which is done by iteration. Custom Lowering for Parabix resides in this phase. In each iteration, the legalizer checks every DAG node for its legality. If the node is illegal and performs operation on some Parabix vector, the Parabix Custom Lowering code will be called to legalize this node; otherwise the default LLVM logic will handle this illegal node. The iteration terminates when every DAG node is legal. Through iteration, the legalizer could introduce new illegal nodes into the graph.
 
-After the operation legalization phase, there is another DAG combining to clean up the messy output. The last two steps for machine code generation remain the same. There are Parabix DAG Combine logic in all the three DAG combining phases. Each DAG combining phase maintains a work list. It traverses the DAG graph for specific operations. If the operation works with Parabix vectors and it fits certain pattern, the Parabix DAG Combine logic will replace the node with a new node or a new sub-tree of nodes. Part(or all) of the new nodes can be appended to the work list so that the legalizer knows to combine it further later. There is not built-in iteration for DAG combining, but the iteration can be emulated by keeping appending the processed nodes to the work list if necessary.
+After the operation legalization phase, there is another DAG combining to clean up the messy output. The last two steps for machine code generation remain the same. There is Parabix DAG Combine logic in all the three DAG combining phases. Each DAG combining phase maintains a work list. It traverses the DAG graph for specific operations. If the operation works with Parabix vectors and it fits a certain pattern, the Parabix DAG Combine logic will replace the node with a new node or a new sub-tree of nodes. Examples of DAG patterns can be found in Section~\ref{sec:long_shift}. Part(or all) of the new nodes can be appended to the work list so that the legalizer knows to combine it further later. There is no built-in iteration for DAG combining, but the iteration can be emulated by keeping appending the processed nodes to the work list if necessary.
 
-In the following sections, we discuss some custom lowering strategies and how they are organized to fit our design goal; then we give some examples of the Parabix DAG Combiner which are usually special cases for a certain operation; finally we show how we use templates to generate code and test cases for the sake of DRY (don't repeat yourself).
+In the following sections, we discuss some custom lowering strategies and how they are organized to fit our design goal. Then we give some examples of the Parabix DAG Combiner which are usually special cases for a certain operation. Finally we show how we use templates to generate code and test cases for the sake of DRY (don't repeat yourself).
 
 \section{Standard Method For Custom Lowering}
 \subsection{Custom Lowering Strategies}
 After the type legalization phase, one shall not generate illegal types again. This means all the phases after type legalization are target-specific. But in practice, almost all the targets support $i8$, $i32$ and $i64$, so there are still general strategies we can apply across targets. For different types like $v32i1$ and $v128i1$, general strategies also exist to lower both of them. We define three legalize actions as the following:
 \begin{enumerate}
     \item Bitcast to full register and replace the operation code. This is useful for all $i1$ vectors, we need to specify the new operation code when defining the action, e.g.\ XOR for ADD on $v32i1$.
-    \item In-place promotion. Automatically apply $i2X$ vector operations on $iX$ vector following the Inductive Doubling Principle.
+    \item In-place promotion. Automatically apply $i2X$ vector operations on an $iX$ vector following the Inductive Doubling Principle.
     \item Custom. Same concept with LLVM Custom Lowering, manually replace an illegal DAG node with a sequence of new DAG nodes. They can be illegal nodes, but they cannot introduce illegal types. All $i2$ vectors are lowered here, also the 1-add version of the $v32i4$ addition.
 \end{enumerate}
 
 \subsection{DAG Combiner}
 \label{sec:long_shift}
-DAG Combiner is the supplement to custom lowering facility. It often focuses on special cases e.g.\ one operation and a subset of possible operands. We give a few examples of Parabix DAG Combiner here.
+DAG Combiner is the supplement to the custom lowering facility. It often focuses on special cases e.g.\ one operation and a subset of possible operands. We give a few examples of Parabix DAG Combiner here.
 
 \begin{figure}[htbp!]
 \centering
@@ -65,11 +65,11 @@ DAG Combiner is the supplement to custom lowering facility. It often focuses on 
 \label{fig:long_shift_good}
 \end{figure}
 
-We first show a peephole optimization that greatly improves the performance of long stream shifting. Long stream shifting shifts left one whole SIMD register with potential shift-in bits from the other SIMD register. Refer to Figure~\ref{fig:long_shift}, we want to shift left {\tt A} by $n$ bits and shift-in the highest $n$ bits from B. To be simple, we assume $n = 1$ and the SIMD register is 128-bit wide. The most straight-forward implementation is listed below:
+We first show a peephole optimization that greatly improves the performance of long stream shifting. Long stream shifting shifts left one whole SIMD register with potential shift-in bits from the other SIMD register. Refer to Figure~\ref{fig:long_shift}, we want to shift left {\tt A} by $n$ bits and shift-in the highest $n$ bits from B. For simplicity, we assume $n = 1$ and the SIMD register is 128-bits wide. The most straight-forward implementation is listed below:
   \[ \text{\tt A1 = shl i128 A, 1} \]
   \[ \text{\tt B1 = lshr i128 B, 127} \]
   \[ \text{\tt R = or i128 A1, B1} \]
-This algorithm is called double shift. It describes clearly what we want to implement so it is the preferred IR code in the library. Since shift on $i128$ is not natively supported, double shifts of $v2i64$ and one shufflevector are needed to implement the $i128$ shift. Thus, we need 4 $v2i64$ shifts, 2 shufflevectors and 3 logic or operations. The $v2i64$ shifts take most of the run time.
+This algorithm is called double shift. It describes clearly what we want to implement so it is the preferred IR code in the library. Since shift on $i128$ is not natively supported, double shifts of $v2i64$ and one shufflevector are needed to implement the $i128$ shift. Thus, we need 4 $v2i64$ shifts, 2 shufflevectors and 3 logic or operations.
 
 \begin{figure}[htbp!]
 \centering
@@ -84,9 +84,9 @@ A better algorithm that uses 2 $v2i64$ shifts, 1 shufflevector and 1 logic or is
   \[ \text{\tt E = lshr <2 x i64> M, <2 x i64> <i32 63, i32 63>} \]
   \[ \text{\tt R = or <2 x i64> D, E} \]
 
-{\tt M} is the key to this algorithm. When we shift left {\tt A} as $v2i64$, we create holes (1-bit shift-in zeros) in the lower end of each field. The correct fill-in data for these holes are just the highest bit in each field of {\tt M}. So we shift right {\tt M} as $v2i64$ to align the bits into correct positions and use logic or operation to fill the holes. This algorithm can be generalized to long stream shift with arbitrary amount.
+{\tt M} is the key to this algorithm. When we shift left {\tt A} as $v2i64$, we create holes (1-bit shift-in zeros) in the lower end of each field. The correct fill-in data for these holes are just the highest bit in each field of {\tt M}. So we shift right {\tt M} as $v2i64$ to align the bits into correct positions and use logic or operation to fill the holes. This algorithm can be generalized to long stream shift of an arbitrary amount.
 
-Once the back end recognizes the double-shift code, it re-implements with the better algorithm. The DAG combining process is described in Figure~\ref{fig:long_shift_nodes}.
+Once the back end recognizes the double-shift code, it re-implements with the latter algorithm. The DAG combining process is described in Figure~\ref{fig:long_shift_nodes}.
 
 The next example is shufflevector for {\tt hsimd<16>::packh}. With the similar code described in Chapter~\ref{three}, LLVM 3.4 does not generate the best assembly code. It generates a sequence of $pextrw$ and $pinsrw$. Even the newst LLVM truck generates 27 lines of assembly. We create the following DAG Combiner and get the 5 lines of equivalent assembly code in Program~\ref{prog:packh_16_asm}.
 \begin{itemize}
@@ -138,24 +138,24 @@ According to Program~\ref{program:packh_2}, we create the following DAG Combiner
     \item \textbf{Combine Result}: four PEXT nodes combined with OR and SHL.
 \end{itemize}
 
-To summarize, this kind of DAG Combiner provides a shortcut for the programmer to do peephole optimization. It can co-exist with a full custom lowering, like the relationship between immediate shifting and arbitrary shifting. Immediate shifting shifts all the vector elements with the same amount, allowing efficient realization for $v32i4$ with $v4i32$ shifts, while we apply In-place Promotion strategy for $v32i4$ arbitrary shifting in the Parabix custom lowering.
+To summarize, this kind of DAG Combiner provides a shortcut for the programmer to do peephole optimization. It can co-exist with a full custom lowering, like the relationship between immediate shifting and arbitrary shifting. Immediate shifting shifts all the vector elements by the same amount, allowing efficient realization for $v32i4$ with $v4i32$ shifts, while we apply the In-place Promotion strategy for $v32i4$ arbitrary shifting in the Parabix custom lowering.
 
-DAG Combiner can optimize operations with illegal type in the phase DAG Combine 1. It is not possible in the custom lowering. But we cannot simply put all the Parabix Custom Lowering logic inside the DAG Combiner. First, it is against LLVM design; DAG Combiner is designed for cleaning up, either the initial code or the messy code generated by the legalization passes \cite{llvm_code_gen}. Second, it cannot utilize the legalization iteration; in custom lowering, general strategies may introduce new illegal operations which are hard to avoid since "illegal" is a target-specific concept. The DAG Combiner, on the other hand, 1) Should not generate illegal operations in the phases after the operation legalization phase. 2) Although it can also work in iteration, most of the lowering logic for common operations are not programmed in this module, we would end up with illegal non-Parabix operations.
+DAG Combiner can optimize operations with illegal types in the phase DAG Combine 1. It is not possible in the custom lowering. But we cannot simply put all the Parabix Custom Lowering logic inside the DAG Combiner. First, it is against LLVM design; DAG Combiner is designed for cleaning up, either the initial code or the messy code generated by the legalization passes \cite{llvm_code_gen}. Second, it cannot utilize the legalization iteration; in custom lowering, general strategies may introduce new illegal operations which are hard to avoid since ``illegal" is a target-specific concept. The DAG Combiner, on the other hand, 1) should not generate illegal operations in the phases after the operation legalization phase, 2) although it can also work in iteration, most of the lowering logic for common operations are not programmed in this module, we would end up with illegal non-Parabix operations.
 
 \section{Templated Implementation}
-During our implementation, we encountered much duplicated code, especially in the test cases; Such duplication is against software design principles and is hard to maintain, sometimes even hard to write; a thorough test file for $i2^k$ vector contains more than two thousand lines of code, most of which are in the same pattern. To keep DRY and save programmer time, we introduced Jinja template engine \cite{jinja_engine}. According to \cite{python_templating}, Jinja belongs to the Engines Mixing Logic into Templates, it allows embedding logic or control-flow into template files. We use Jinja because:
+During our implementation, we encountered a lot of duplicated code, especially in the test cases; Such duplication is against software design principles and is hard to maintain, sometimes even hard to write; a thorough test file for $i2^k$ vector contains more than two thousand lines of code, most of which are in the same pattern. To keep DRY and save programmer time, we introduced the Jinja template engine \cite{jinja_engine}. According to \cite{python_templating}, Jinja belongs to the Engines Mixing Logic into Templates, it allows embedding logic or control-flow into template files. We use Jinja because:
 
 \begin{itemize}
     \item We can write all pieces of the content in one file, so it is easier to understand. Where in the Engines using Value Substitution, the driver code usually contains many tiny pieces of content. The reader must read the driver code as well as the template file to understand the output. One template example can be found in Program~\ref{program:jinja}.
-    \item Like the standard Model-View-Controller structure in the web design, our driver code needs only provide abstract data (like operation names in IR and the corresponding C++ library calls). How to present these data is not its responsibility. In the other word, we can have significant changes in the template without changing the driver.
+    \item Like the standard Model-View-Controller structure in the web design, our driver code needs only provide abstract data (like operation names in IR and the corresponding C++ library calls). How to present these data is not its responsibility. In the other words, we can have significant changes in the template without changing the driver.
     \item Jinja uses python and python is easy and quick to use.
 \end{itemize}
 
 \subsection{Code Generation For $i2$ Vector}
-In Chapter~\ref{four}, we legalized $i2$ vector operations with boolean functions. In our implementation, with the Quine-McCluskey solver, we got 11 sets of formula which reside in one compact data script. We wrote template files to generate 11 C++ functions for them. This approach has the following benefits:
+In Chapter~\ref{four}, we legalized $i2$ vector operations with boolean functions. In our implementation, with the Quine-McCluskey solver, we got 11 sets of formulas which reside in one compact data script. We wrote template files to generate 11 C++ functions for them. This approach has the following benefits:
 \begin{itemize}
-    \item Collect all the critical formula together so that possible future updates are easy to deploy.
-    \item Implementation details only reside in the template file, so we are able to change the code structure easily. For now we create one function for each formula, but it is possible that we plan to create one big switch statement and generate one case for each formula instead. This can be done with only a few lines of change in the template.
+    \item It collects all the critical formula together so that possible future updates are easy to deploy.
+    \item Implementation details only reside in the template file, so we are able to change the code structure easily. For now we create one function for each formula, but it is possible that we could create one big switch statement and generate one case for each formula instead. This can be done with only a few lines of change in the template.
 \end{itemize}
 
 Example formula of $v64i2$ addition as well as the function template is listed in the Program~\ref{prog:i2_codegen} and Program~\ref{prog:i2_func_template}.
@@ -201,7 +201,7 @@ Example formula of $v64i2$ addition as well as the function template is listed i
 \end{program}
 
 \subsection{Test Code And IR Library Generation}
-We test correctness of our modified LLVM back end by comparing results with the IDISA library. For example we extend LLVM to support $i1$ vectors, but does the extention work? We answer this question by first constructing a IR library of all the functions on $i1$ such as the {\tt add\_1} listed in the top left corner in Figure~\ref{figure:test}. We then write a driver to generate random test data, put them through the IR functions as well as the corresponding IDISA functions, check if the results are the same.
+We test correctness of our modified LLVM back end by comparing results with the IDISA library. For example we extend LLVM to support $i1$ vectors, but does the extention work? We answer this question by first constructing a IR library of all the functions on $i1$ such as the {\tt add\_1} listed in the top left corner in Figure~\ref{figure:test}. We then write a driver to generate random test data, put them through the IR functions as well as the corresponding IDISA functions, and check if the results are the same.
 
 There is one problem in this approach. The driver and IDISA are both written in C++ but the IR library is in low-level representation. How to mix them together? We solve the problem by compiling the IR code into object files. A seperate header file of IR-function signatures is maintained so that the driver code can call IR functions as external functions. The overview of the test system can be found in Figure~\ref{figure:test}. We use templates for both the IR library and the driver, some sample templates can be found in Program~\ref{program:jinja}.
 
