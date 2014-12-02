@@ -142,20 +142,27 @@ Shufflevector and bitcast could also cover IDISA expansion operations. We list t
 
 The rest of the expansion operations can be implemented as the following:
 \begin{itemize}
-    \item Merge low: similar to merge high but with a different shuffle mask. For example, {\tt esimd<16>::mergel} uses the mask {\tt 0, 8, 1, 9, 2, 10, 3, 11}.
-    \item Unary operations like sign extension and zero extension: LLVM has built-in instructions with the same name.
+    \item Merge low: similar to merge high with a different mask. For example, {\tt esimd<16>::mergel} uses the mask {\tt 0, 8, 1, 9, 2, 10, 3, 11}.
+    \item Unary operations like sign extension and zero extension: LLVM has built-in instructions with the same function.
 \end{itemize}
 
 For field movement operations:
 \begin{itemize}
-    \item Field extract or insert: LLVM IR offers two vector instructions {\tt insertelement} and {\tt extractelement} for them.
+    \item Field extract or insert: IR offers two vector instructions {\tt insertelement} and {\tt extractelement} for them.
     \item Constant fill: it fills each field with an integer constant. In IR this can be coded with vector constants such as {\tt <4 x i32> <i32 1, i32 10, i32 30, i32 99>}.
     \item Unary and binary movement: those operations move fields within one register or among two registers and they can be implemented with shufflevector.
 \end{itemize}
 
 The full register operations could be coded in large-size integers like $i128$ and $i256$. You can add / multiply / shift it as a normal integer. In fact, all the integer instructions LLVM support can be applied to them thus enabling more complexed operations that IDISA does not support.
 
-To sum up, with support of all the five categories of IDISA operations, we are able to replace the IDISA library with pure IR implementation. However, there is still one question to answer: since LLVM has its own C++ compiler called Clang and we could compile the C++ IDISA library into IR, what is the difference between the Clang-generated IR and our hand-written IR library? There are at least three major differences:
+To sum up, we are able to replace the IDISA library with pure IR implementation. However, there is still one question to answer: since LLVM has its own C++ compiler called Clang and we could compile the C++ IDISA library into IR, what is the difference between the Clang-generated IR and our hand-written IR library? We show a tool chain diagram in Figure~\ref{fig:tool_chain_diagrams} which explains what is a Clang-generated IR and how the IR library is compiled against the Parabix applications. There are at least three major differences:
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=140mm]{draw/tool_chain_diagrams.png}
+\caption[Tool chain diagrams for compiling and incorporating the IR library with Parabix]{Tool chain diagrams for compiling and incorporating the IR library with Parabix. The IR library header is used to declare external functions.}
+\label{fig:tool_chain_diagrams}
+\end{figure}
 
 \begin{program}
 \begin{verbatim}
@@ -165,7 +172,8 @@ To sum up, with support of all the five categories of IDISA operations, we are a
     %1 = tail call <8 x i16> @llvm.x86.sse2.psrli.w(<8 x i16> %0, i32 8) #1
     %2 = bitcast <2 x i64> %b to <8 x i16>
     %3 = tail call <8 x i16> @llvm.x86.sse2.psrli.w(<8 x i16> %2, i32 8) #1
-    %4 = tail call <16 x i8> @llvm.x86.sse2.packuswb.128(<8 x i16> %3, <8 x i16> %1) #1
+    %4 = tail call <16 x i8> @llvm.x86.sse2.packuswb.128(<8 x i16> %3,
+                                                         <8 x i16> %1) #1
     %5 = bitcast <16 x i8> %4 to <2 x i64>
     ret <2 x i64> %5
   }
@@ -175,7 +183,7 @@ To sum up, with support of all the five categories of IDISA operations, we are a
 \end{program}
 
 \begin{enumerate}
-    \item Clang could not remove all the target-dependency from the C++ source. Not every IR instruction is target-independent. For example, IDISA function {\tt hsimd<8>::packh} compiles to Program~\ref{prog:packh_8_sse2_llvm} and all the functions that start with {\tt @llvm.x86.sse2} are only available on X86 SSE2. This is inherent to the use of direct compiler intrinsic in IDISA.
+    \item Clang could not remove all the target-dependency from the C++ source. Not every IR instruction is target-independent. For example, IDISA function {\tt hsimd<8>::packh} compiles to Program~\ref{prog:packh_8_sse2_llvm} and all the functions that start with {\tt @llvm.x86.sse2} are only available on ISAs that support X86 SSE2. This is inherent to the use of direct compiler intrinsic in IDISA.
     \newpage
 
     \item Illegal operations are handled in different levels. Compare the following IR implementation for {\tt simd<4>::add}:
@@ -200,14 +208,14 @@ To sum up, with support of all the five categories of IDISA operations, we are a
         \end{verbatim}
       \end{center}
 
-    Given that addition on $v32i4$ is not supported by this target, the latter implements it with $v16i8$ addition and a few logic operations in the front end level. Target information is required. And even if the latter code is migrated to a target that supports $v32i4$ addition natively, it could not use that ability unless some optimization could recognize the intention behind these 12 lines.
+    Given that addition on $v32i4$ is not supported by this target, the latter implements it with $v16i8$ addition and a few logic operations in the source code level. Target information is required. And even if the latter code is migrated to a target that supports $v32i4$ addition natively, it could not use that ability unless some optimization could recognize the intention behind these 12 lines.
 
-    On the other hand, the former one-line code is not extended until the legalization phase in the back end. The target-specific details are thus left to the back end.
+    On the other hand, the former one-line code is not extended until the legalization phase. The target-specific details are thus left to the LLVM code generator.
 
-    \item Since the illegal operation is not extended until the back end, more optimizations are available. The high-level intention of the IR instruction is better preserved. For {\tt simd<4>::add}, if one of the operand is all zero, the front end could remove the single line of \verb|add <32 x i4>| more easily than removing the 12 lines of code in the Clang-generated IR\@. It is useful for constant combination as well as other peephole optimizations because it simplifies the pattern recognition. We give an example of peephole optimization on the long integer shifting in Chapter~\ref{five}.
+    \item Since the illegal operation is not extended until the legalization phase, more optimizations are available. The high-level intention of the IR instruction is better preserved. For {\tt simd<4>::add}, if one of the operand is all zero, the IR optimizer could remove the single line of \verb|add <32 x i4>| more easily than removing the 12 lines of code in the Clang-generated IR\@. It is useful for constant combination as well as other peephole optimizations because it simplifies the pattern recognition. We give an example of peephole optimization on the long integer shifting in Chapter~\ref{five}.
 \end{enumerate}
 
-This comparison explains our design goal: to replace the IDISA library with a high-level target-independent IR library. It is different from the IDISA approach fundamentally in the way that it tries not to instruct the compiler how to implement this operation, but rather tell what to implement.
+This comparison explains our design goal: to replace the IDISA library with a high-level target-independent IR library. It is different from the IDISA library fundamentally in the way that it tries not to instruct the compiler how to implement this operation, but rather tell what to implement.
 
-Could LLVM compile the IR library to efficient machine code? Experiments on X86 suggests no. Simple functions that directly correspond to native instructions like {\tt simd\_add\_8} in Program~\ref{prog:add_8_llvm} can be compiled correctly, but for some more complexed instructions like shufflevector, where no target so far has native support for it, poor machine code might be generated (e.g.\ pack high for 16-bit fields). Furthermore, LLVM does not have good support for vectors of small elements, simple code like \verb|add <128 x i1> %a, %b| would generate a large amount of memory operations and eight additions on SIMD registers. To achieve a better code generation, we bring many of the strategies from IDISA to the LLVM back end. The next two chapters describe them in detail.
+Could LLVM compile the IR library to efficient machine code? Experiments on X86 suggests no. Simple functions that directly correspond to native instructions like {\tt simd\_add\_8} in Program~\ref{prog:add_8_llvm} can be compiled correctly, but for some more complex instructions like shufflevector, where no target so far has native support for it, poor machine code might be generated (e.g.\ pack high for 16-bit fields). Furthermore, LLVM does not have good support for vectors of small elements, simple code like \verb|add <128 x i1> %a, %b| would generate a large amount of memory operations and eight additions on SIMD registers. To achieve a better code generation, we bring many of the strategies from IDISA to the LLVM back end. The next two chapters describe this in detail.
 
