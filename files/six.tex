@@ -220,7 +220,7 @@ An important Parabix application is regular expression matching. A grep-like too
 \label{prog:uadd_carryin}
 \end{program}
 
-To compare with the unmodified LLVM, we need to emulate this new intrinsic. LLVM supports {\tt uadd.with.overflow} which does not take the carry-in bit into account. The pseudo code for "add with carry" is listed in Program~\ref{prog:uadd}. Then we can compare our back end with the unmodified LLVM\@. The same regular expressions and data files are used in \cite{rob_regex}. Since we only care about the improvement between back ends, the details of the regular expressions are not important. We show the relative instruction counts in Figure~\ref{fig:inst_count_long_add}. The experiment was done with 128-bit SIMD registers and most of the improvement comes from the fact that our back end only requires one addition.
+To compare with the unmodified LLVM, we need to emulate this new intrinsic. LLVM supports {\tt uadd.with.overflow} which does not take the carry-in bit into account. The pseudo code for "add with carry" is listed in Program~\ref{prog:uadd}. Then we can compare our back end with the unmodified LLVM\@. The same regular expressions and data files are used in \cite{rob_regex}. Since we only care about the improvement between back ends, the details of the regular expressions are not important. We show the relative instructions count in Figure~\ref{fig:inst_count_long_add} and we get around 20 percent improvement. The experiment was done with 128-bit SIMD registers. Most of the improvement comes from the fact that our back end only requires one addition. We also measured the relative CPU cycles. There are around 10 percent reduction in CPU cycles with our new intrinsic, which implies that the sequential addition has higher throughput (instructions per cycle).
 
 \begin{program}[htbp!]
 \begin{verbatim}
@@ -249,7 +249,7 @@ To compare with the unmodified LLVM, we need to emulate this new intrinsic. LLVM
 \label{fig:inst_count_long_add}
 \end{figure}
 
-We then compare the long stream shifting algorithms. We discussed two algorithms in Section~\ref{sec:long_shift}; we implemented a DAG combiner in our back end. IR code of double shift can be compiled on the unmodified LLVM, so it is convenient that no new source code needs to be written. We used exactly the same code on both of the back ends. To avoid a difference in "add with carry", we used a logic that generates the same machine code on both back ends. The comparison of long stream shifting with 128-bit SIMD registers is listed in Figure~\ref{fig:inst_count_long_shift}. We can see a reduction of 10 to 20 percent in instructions.
+We then compare the long stream shifting algorithms. We discussed two algorithms in Section~\ref{sec:long_shift}; we implemented a DAG combiner in our back end. IR code of double shift can be compiled on the unmodified LLVM, so it is convenient that no new source code needs to be written. We used exactly the same code on both of the back ends. To avoid a difference in "add with carry", we used a logic that generates the same machine code on both back ends. The comparison of long stream shifting with 128-bit SIMD registers is listed in Figure~\ref{fig:inst_count_long_shift}. We can see a reduction of 10 to 20 percent in instructions. For CPU cycles, a reduction of 20 percent is achieved. The reduction in CPU cycles equals to, if not greater than, the reduction in instructions count. It means the long stream shifting uses less instructions as well as maintaining a good throughput.
 
 \begin{figure}[htbp!]
 \centering
@@ -258,7 +258,7 @@ We then compare the long stream shifting algorithms. We discussed two algorithms
 \label{fig:inst_count_long_shift}
 \end{figure}
 
-Finally, we study the behaviour of long stream addition and shifting with 256-bit SIMD registers. We turned on both of the optimizations for icgrep. The relative instruction count is listed in Figure~\ref{fig:inst_count_all_256}. From the micro-benchmark we already know that long stream addition works better than the sequential addition on this wider SIMD register. Together with long stream shifting, we achieved a substantial 30 to 40 percent instruction reduction against the unmodified LLVM.
+Next, we study the behaviour of long stream addition and shifting with 256-bit SIMD registers. We turned on both of the optimizations for icgrep. The relative instruction count is listed in Figure~\ref{fig:inst_count_all_256}. From the micro-benchmark we already know that long stream addition works better than the sequential addition on this wider SIMD register. Together with long stream shifting, we achieved a substantial 30 to 40 percent instruction reduction against the unmodified LLVM\@. We also achieved around 40 percent reduction in CPU cycles.
 
 \begin{figure}[htbp!]
 \centering
@@ -266,3 +266,19 @@ Finally, we study the behaviour of long stream addition and shifting with 256-bi
 \caption[Improvement of icgrep on machines with 256-bit SIMD registers]{Improvement of icgrep on machines with 256-bit SIMD registers. Both long stream shifting and addition are used. The instruction count is compared with the unmodified LLVM with 256-bit SIMD registers.}
 \label{fig:inst_count_all_256}
 \end{figure}
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=140mm]{draw/inst_count_scalability.png}
+\caption[Improved scalability of icgrep]{Improved scalability of icgrep. With the modified LLVM, icgrep gets more instructions count improvement by switching from 128-bit SIMD to 256-bit SIMD registers. Both long stream addition and shifting are used.}
+\label{fig:inst_count_scalability}
+\end{figure}
+
+\begin{figure}[htbp!]
+\centering
+\includegraphics[width=140mm]{draw/cpu_cycles_scalability.png}
+\caption[Improved scalability of icgrep in CPU cycles]{Improved scalability of icgrep in CPU cycles.}
+\label{fig:cpu_cycles_scalability}
+\end{figure}
+
+Finally, we study the scalability of the modified LLVM\@. We want to check the improvement we can get by switching from 128-bit SIMD to 256-bit SIMD programming. We show the relative instructions count in Figure~\ref{fig:inst_count_scalability}. Extended LLVM can always benefit around 30 percent from using the wider SIMD registers, but the original LLVM sometimes even has performance drops. Figure~\ref{fig:cpu_cycles_scalability} shows the same comparison on a different metric: CPU cycles. Extended LLVM benefit around 20 percent from the wider SIMD registers. So we conclude that our LLVM back end has better scalability.
